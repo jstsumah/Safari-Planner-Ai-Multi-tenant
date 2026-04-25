@@ -4,9 +4,10 @@ import {
   Globe, ArrowRight, FileText, Bookmark,
   Users, ChevronRight, Play, Check, Calculator,
   Heart, User, Briefcase, Star, HelpCircle, 
-  Mail, Phone, MapPin, Plus, Minus, Menu, X
+  Mail, Phone, MapPin, Plus, Minus, Menu, X, Building2
 } from 'lucide-react';
 import { Tooltip } from './ui/Tooltip';
+import { supabase } from '../lib/supabase';
 
 import { BrandingConfig } from '../types';
 
@@ -15,14 +16,56 @@ interface LandingPageProps {
   onAuth: () => void;
   onAdmin: () => void;
   onCalculator: () => void;
+  onViewProfile?: () => void;
+  onViewPartners?: () => void;
   branding: BrandingConfig;
   masterItineraries?: any[];
   isAuthenticated?: boolean;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAuth, onAdmin, onCalculator, branding, masterItineraries = [], isAuthenticated = false }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ 
+  onStart, 
+  onAuth, 
+  onAdmin, 
+  onCalculator, 
+  onViewProfile,
+  onViewPartners,
+  branding, 
+  masterItineraries = [], 
+  isAuthenticated = false 
+}) => {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [companies, setCompanies] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    const fetchCompanies = async () => {
+      const { data } = await supabase.from('companies').select('*').eq('status', 'active').limit(10);
+      if (data) setCompanies(data);
+    };
+    fetchCompanies();
+  }, []);
+
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const [isHovered, setIsHovered] = React.useState(false);
+
+  React.useEffect(() => {
+    const container = scrollRef.current;
+    if (!container || companies.length === 0 || isHovered) return;
+
+    let requestId: number;
+    const scroll = () => {
+      container.scrollLeft += 0.5; // Very slow, smooth scroll
+      if (container.scrollLeft >= container.scrollWidth - container.clientWidth) {
+        container.scrollLeft = 0;
+      }
+      requestId = requestAnimationFrame(scroll);
+    };
+
+    requestId = requestAnimationFrame(scroll);
+    return () => cancelAnimationFrame(requestId);
+  }, [companies, isHovered]);
+
   const [contactForm, setContactForm] = useState({
     name: '',
     email: '',
@@ -347,6 +390,54 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAuth, onAdmin, onC
           </div>
         </section>
       )}
+
+      {/* Partners Side Scroll Section */}
+      <section className="py-20 bg-white border-b border-safari-100 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6 mb-10 flex items-end justify-between">
+          <div className="space-y-4">
+            <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-safari-400">Our Network</h2>
+            <h3 className="text-3xl md:text-4xl font-extrabold text-safari-900 tracking-tight">Verified Agency Partners</h3>
+          </div>
+          <button 
+            onClick={onViewPartners}
+            className="flex items-center gap-2 text-safari-600 font-bold text-xs uppercase tracking-widest hover:text-safari-900 transition-colors group"
+          >
+            View All Partners <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+          </button>
+        </div>
+
+        <div 
+          ref={scrollRef}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          className="flex gap-6 overflow-x-auto pb-8 px-6 no-scrollbar snap-x transition-all"
+        >
+          {companies.length > 0 ? companies.map((partner) => (
+            <div 
+              key={partner.id} 
+              className="flex-shrink-0 w-80 bg-safari-50 p-8 rounded-3xl border border-safari-100 hover:shadow-xl hover:shadow-safari-900/5 transition-all snap-start group"
+            >
+              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-safari-600 mb-6 border border-safari-100 shadow-sm group-hover:scale-110 transition-transform">
+                <Building2 size={24} />
+              </div>
+              <h4 className="text-xl font-bold text-safari-900 mb-2 truncate">{partner.name}</h4>
+              <p className="text-safari-500 text-sm font-medium line-clamp-2 mb-6 h-10">
+                {partner.branding?.agencyDescription || "Official partner and specialist in curated African safari experiences."}
+              </p>
+              <button 
+                onClick={onViewPartners}
+                className="flex items-center gap-2 text-safari-900 font-black text-[10px] uppercase tracking-widest"
+              >
+                Learn More <ChevronRight size={14} />
+              </button>
+            </div>
+          )) : (
+            [1,2,3,4,5].map(i => (
+              <div key={i} className="flex-shrink-0 w-80 h-64 bg-safari-50 rounded-3xl border border-safari-50 animate-pulse" />
+            ))
+          )}
+        </div>
+      </section>
 
       {/* Dual Audience Section */}
       <section id="who-it-is-for" className="py-24 bg-safari-100/50 scroll-mt-20">
@@ -682,6 +773,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart, onAuth, onAdmin, onC
             <ul className="space-y-4 text-sm font-bold text-safari-300">
               <li className="flex items-center gap-2"><span className="w-1 h-1 bg-safari-500 rounded-full shrink-0" /> <button onClick={onStart} className="hover:text-white transition-colors">Planning Hub</button></li>
               <li className="flex items-center gap-2"><span className="w-1 h-1 bg-safari-500 rounded-full shrink-0" /> <button onClick={onAdmin} className="hover:text-white transition-colors">Partner Dashboard</button></li>
+              <li className="flex items-center gap-2"><span className="w-1 h-1 bg-safari-500 rounded-full shrink-0" /> <button onClick={onViewPartners} className="hover:text-white transition-colors">Our Partners</button></li>
+              <li className="flex items-center gap-2"><span className="w-1 h-1 bg-safari-500 rounded-full shrink-0" /> <button onClick={onViewProfile} className="hover:text-white transition-colors font-bold text-safari-400">Agency Reputation</button></li>
               <li className="flex items-center gap-2"><span className="w-1 h-1 bg-safari-500 rounded-full shrink-0" /> <button onClick={onCalculator} className="hover:text-white transition-colors">Cost Estimator</button></li>
               <li className="flex items-center gap-2"><span className="w-1 h-1 bg-safari-500 rounded-full shrink-0" /> <button className="hover:text-white transition-colors">Itineraries</button></li>
             </ul>

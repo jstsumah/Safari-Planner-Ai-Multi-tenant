@@ -94,6 +94,8 @@ export interface BrandingConfig {
   contactAddress?: string;
   agencyName?: string;
   agencyDescription?: string;
+  establishedYear?: string;
+  statistics?: { label: string; value: string; iconType: 'heart' | 'globe' | 'shield' | 'award' | 'users' | 'star' }[];
   socialLinks?: { platform: string; url: string }[];
   parkFees?: { name: string; keywords: string[]; rate: number }[];
   transportRates?: { type: string; dailyRate: number }[];

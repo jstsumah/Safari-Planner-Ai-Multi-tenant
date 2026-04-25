@@ -98,6 +98,23 @@ CREATE TABLE IF NOT EXISTS agency_config (
     UNIQUE(company_id, key)
 );
 
+-- Reviews Table
+CREATE TABLE IF NOT EXISTS reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
+    author_name TEXT NOT NULL,
+    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    comment TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Enable RLS for Reviews
+ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Read Reviews" ON reviews FOR SELECT USING (true);
+CREATE POLICY "Public Insert Reviews" ON reviews FOR INSERT WITH CHECK (true);
+CREATE POLICY "Super User Global Access - Reviews" ON reviews FOR ALL USING (is_super_user());
+CREATE POLICY "Admins can manage own reviews" ON reviews FOR ALL USING (company_id = get_my_company());
+
 -- Gallery Images Table
 CREATE TABLE IF NOT EXISTS gallery_images (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

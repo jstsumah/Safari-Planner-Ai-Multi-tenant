@@ -8,6 +8,8 @@ import PropertyDetailView from './components/PropertyDetailView';
 import SavedItinerariesList from './components/SavedItinerariesList';
 import CostingModule from './components/CostingModule';
 import Onboarding from './components/Onboarding';
+import CompanyProfile from './components/CompanyProfile';
+import PartnersPage from './components/PartnersPage';
 import { useAuth } from './hooks/useAuth';
 import { SafariFormData, GeneratedItinerary, Lodge, BudgetTier, TransportType, BrandingConfig } from './types';
 import { generateSafariItinerary } from './services/aiService';
@@ -170,8 +172,11 @@ const App: React.FC = () => {
   const [activeLodge, setActiveLodge] = useState<Lodge | null>(null);
   const [isLandingEnabled, setIsLandingEnabled] = useState(true);
   const [branding, setBranding] = useState<BrandingConfig>(DEFAULT_BRANDING);
+  const [systemBranding, setSystemBranding] = useState<BrandingConfig>(DEFAULT_BRANDING);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
 
-  const [viewMode, setViewMode] = useState<'landing' | 'form' | 'itinerary' | 'history' | 'admin' | 'calculator' | 'auth'>(() => {
+  const [viewMode, setViewMode] = useState<'landing' | 'form' | 'itinerary' | 'history' | 'admin' | 'calculator' | 'auth' | 'partners'>(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('master') || params.get('itin')) return 'itinerary';
     if (params.get('tool') === 'calculator') return 'calculator';
@@ -279,6 +284,26 @@ const App: React.FC = () => {
     root.style.setProperty('--body-line-height', config.bodyLineHeight || '1.6');
   }, []);
 
+  // 0. Fetch System Branding (Global Defaults)
+  useEffect(() => {
+    const fetchSystemBranding = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('companies')
+          .select('branding')
+          .eq('slug', 'system')
+          .single();
+        
+        if (data?.branding) {
+          setSystemBranding(data.branding);
+        }
+      } catch (e) {
+        console.warn("Global system branding not found, using defaults.");
+      }
+    };
+    fetchSystemBranding();
+  }, []);
+
   // 1. Initialize branding and settings on mount or company change
   useEffect(() => {
     // defer updates to avoid synchronous cascade warnings
@@ -287,14 +312,9 @@ const App: React.FC = () => {
       if (company?.branding) {
         setBranding(company.branding);
       } else {
-        // Priority 2: localStorage (for non-logged in or local persistence)
-        const savedBranding = localStorage.getItem('safari_config_branding');
-        if (savedBranding) {
-          try {
-            setBranding(JSON.parse(savedBranding));
-          } catch (e) {
-            console.warn("Failed to parse saved branding", e);
-          }
+        // Priority 2: System Branding (if fetched)
+        if (systemBranding) {
+          setBranding(systemBranding);
         }
       }
 
@@ -306,12 +326,14 @@ const App: React.FC = () => {
     }, 0);
     
     return () => clearTimeout(timeoutId);
-  }, [company]);
+  }, [company, systemBranding]);
 
   // 2. Apply branding whenever the brand state changes
   useEffect(() => {
-    applyBranding(branding);
-  }, [branding, applyBranding]);
+    // Priority: systemBranding for Landing Page, branding (Agency) for everything else
+    const targetBranding = viewMode === 'landing' ? systemBranding : (branding || systemBranding);
+    applyBranding(targetBranding);
+  }, [viewMode, branding, systemBranding, applyBranding]);
 
   // 3. Listen for cross-tab storage changes
   useEffect(() => {
@@ -499,7 +521,9 @@ const App: React.FC = () => {
   if (viewMode === 'landing') {
     return (
       <LandingPage 
-        branding={branding}
+        branding={systemBranding}
+        onViewProfile={() => setIsProfileOpen(true)}
+        onViewPartners={() => setViewMode('partners')}
         onStart={() => {
           if (user && profile) {
             const userType = user.user_metadata?.user_type || (profile.company_id ? 'agency' : 'user');
@@ -575,6 +599,19 @@ const App: React.FC = () => {
           © 2026 SafariPlanner.ai • Powered by Intelligence, Crafted by Humans
         </footer>
       </div>
+    );
+  }
+
+  if (viewMode === 'partners') {
+    return (
+      <PartnersPage 
+        branding={branding}
+        onBack={() => setViewMode('landing')}
+        onViewProfile={(companyId) => {
+          setSelectedCompanyId(companyId);
+          setIsProfileOpen(true);
+        }}
+      />
     );
   }
 
@@ -727,6 +764,16 @@ const App: React.FC = () => {
             />
           )}
         </main>
+        {isProfileOpen && (company || selectedCompanyId) && (
+          <CompanyProfile 
+            companyId={selectedCompanyId || company?.id || ''} 
+            branding={branding} 
+            onClose={() => {
+              setIsProfileOpen(false);
+              setSelectedCompanyId(null);
+            }} 
+          />
+        )}
       </div>
     </>
   );

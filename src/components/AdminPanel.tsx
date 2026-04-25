@@ -1,18 +1,19 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Plus, Trash2, Save, Building, LogOut, Loader2, 
+  Plus, Trash2, Save, Building, Building2, LogOut, Loader2, 
   Edit3, 
   LayoutDashboard, MessageSquare, Menu, ChevronLeft, ChevronDown, ChevronUp,
   RefreshCw, Compass, MapPin, Mail, Phone,
   Eye, ReceiptText, FileText, CreditCard,
   Calculator, Bookmark, FileCheck, Wand2,
-  Wallet, Settings as SettingsIcon, Monitor, Palette,
+  Wallet, Settings as SettingsIcon, Palette,
   Share2, Check, Users, UserPlus, Type, Image as ImageIcon, HelpCircle, Quote, Database,
-  ShieldAlert, ShieldCheck
+  ShieldAlert, ShieldCheck, Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Lodge, SafariFormData, GeneratedItinerary, CostingReport, Payment, BudgetTier, TransportType, BrandingConfig, TeamMember } from '../types';
+import CompanyProfile from './CompanyProfile';
 import { supabase } from '../lib/supabase';
 import CostingModule from './CostingModule';
 import InvoiceModule from './InvoiceModule';
@@ -126,6 +127,8 @@ const DEFAULT_BRANDING: BrandingConfig = {
   h6FontSize: '18px',
   h6FontWeight: '600',
   h6LetterSpacing: '0',
+  agencyName: 'SafariPlanner Agency',
+  agencyDescription: 'A premium safari agency providing bespoke African adventures with expert local guides and sustainable practices.',
   contactEmail: 'hello@safariplanner.ai',
   contactPhone: '+254 700 000 000',
   contactAddress: 'Nairobi, Kenya',
@@ -220,9 +223,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Configuration State
-  const [isLandingEnabled, setIsLandingEnabled] = useState(true);
   const [branding, setBranding] = useState<BrandingConfig>(DEFAULT_BRANDING);
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'visuals' | 'landing' | 'contact' | 'data'>('general');
+  const [globalBranding, setGlobalBranding] = useState<BrandingConfig>(DEFAULT_BRANDING);
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'system' | 'visuals' | 'landing' | 'business' | 'data'>('visuals');
 
   // Data State
   const [leads, setLeads] = useState<any[]>([]);
@@ -248,6 +251,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [viewingItinerary, setViewingItinerary] = useState<{itinerary: GeneratedItinerary, formData: SafariFormData, id?: string, type?: 'lead' | 'master'} | null>(null);
   const [isFinancialsOpen, setIsFinancialsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   // Super Hub Add States
   const [isAddCompanyOpen, setIsAddCompanyOpen] = useState(false);
@@ -428,9 +432,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   }, [company, profile]);
 
   const fetchConfig = useCallback(async () => {
-    if (company) {
-      setIsLandingEnabled(company.is_landing_enabled ?? true);
-      if (company.branding) setBranding(company.branding);
+    if (company && company.branding) {
+      setBranding(company.branding);
+    }
+    
+    // Always fetch global branding for super admin management
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('branding')
+        .eq('slug', 'system')
+        .single();
+      
+      if (data?.branding) {
+        setGlobalBranding(data.branding);
+      }
+    } catch (e) {
+      console.warn("Global system branding not found, using defaults.");
+      setGlobalBranding(DEFAULT_BRANDING);
     }
   }, [company]);
 
@@ -510,48 +529,83 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     ensureUserInTeam();
   }, [user, profile, company, teamMembers, fetchTeamMembers]);
 
-  const handleToggleLanding = async (enabled: boolean) => {
-    if (!company) return;
-    try {
-      setIsLandingEnabled(enabled);
-      const { error } = await supabase
-        .from('companies')
-        .update({ 
-          is_landing_enabled: enabled,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', company.id);
-      
-      if (error) throw error;
-      
-      await refreshProfile();
-      toast.success(`Landing page ${enabled ? 'enabled' : 'disabled'} successfully.`);
-    } catch (err: any) {
-      toast.error("Failed to update landing page status: " + err.message);
-    }
-  };
-
   const handleSaveBranding = async () => {
-    if (!company) return;
+    const isLandingTab = activeSettingsTab === 'landing' && profile?.is_super_user;
+    const targetBranding = isLandingTab ? globalBranding : branding;
+    
     setIsSavingBranding(true);
     try {
-      const { error } = await supabase
-        .from('companies')
-        .update({ 
-          branding: branding,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', company.id);
-      
-      if (error) throw error;
+      if (isLandingTab) {
+        // Save to system record
+        const { data: systemCo } = await supabase.from('companies').select('id').eq('slug', 'system').single();
+        
+        let targetId;
+        if (systemCo) {
+          targetId = systemCo.id;
+        } else {
+          // Create system record if missing
+          const { data: newCo, error: createError } = await supabase
+            .from('companies')
+            .insert([{ name: 'System Global Defaults', slug: 'system', branding: targetBranding }])
+            .select()
+            .single();
+          if (createError) throw createError;
+          targetId = newCo.id;
+        }
+
+        const { error } = await supabase
+          .from('companies')
+          .update({ 
+            branding: targetBranding,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', targetId);
+        
+        if (error) throw error;
+        toast.success("Global landing page configuration updated.");
+      } else {
+        if (!company) return;
+        const { error } = await supabase
+          .from('companies')
+          .update({ 
+            branding: targetBranding,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', company.id);
+        
+        if (error) throw error;
+        toast.success("Agency branding updated.");
+      }
 
       await refreshProfile();
-      toast.success("Branding configuration updated successfully.");
+      fetchConfig(); // Refresh both states
     } catch (err: any) {
-      toast.error("Failed to save branding: " + err.message);
+      toast.error("Failed to save: " + err.message);
     } finally {
       setIsSavingBranding(false);
     }
+  };
+
+  const handleHeroImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("File is too large. Maximum size is 2MB for optimized storage.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (activeSettingsTab === 'landing' && profile?.is_super_user) {
+        setGlobalBranding({ ...globalBranding, heroImage: result });
+      } else {
+        setBranding({ ...branding, heroImage: result });
+      }
+      toast.success("Image uploaded. Remember to save configuration changes.");
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleRecordPayment = async (paymentData: Partial<Payment>) => {
@@ -1040,6 +1094,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         </nav>
 
         <div className={`px-7 py-6 border-t border-safari-800 flex items-center gap-6 ${isSidebarCollapsed ? 'flex-col' : 'justify-start'}`}>
+          <Tooltip content="Company Public Profile">
+            <button onClick={() => setIsProfileOpen(true)} className="text-safari-400 hover:text-white transition-colors">
+              <Building2 size={20} />
+            </button>
+          </Tooltip>
+
           <Tooltip content="Return to Planner">
             <button onClick={onClose} className="text-safari-400 hover:text-white transition-colors">
               <RefreshCw size={20} />
@@ -1099,6 +1159,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                />
             </div>
           </div>
+        )}
+
+        {isProfileOpen && company && (
+          <CompanyProfile 
+            companyId={company.id} 
+            branding={branding} 
+            onClose={() => setIsProfileOpen(false)} 
+          />
         )}
 
         {activeTab === 'super_hub' && (
@@ -1311,108 +1379,67 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-bold text-safari-900 tracking-tight">App Configuration</h1>
-                <p className="text-safari-500 font-medium">Control landing experience, brand identity, and business rules.</p>
-              </div>
-              <div className="flex items-center gap-1 p-1 bg-safari-50 rounded-xl border border-safari-100 self-start md:self-auto overflow-x-auto no-scrollbar">
-                {[
-                  { id: 'general', label: 'General', icon: <Monitor size={14} /> },
-                  { id: 'visuals', label: 'Visuals', icon: <Palette size={14} /> },
-                  { id: 'landing', label: 'Landing', icon: <LayoutDashboard size={14} /> },
-                  { id: 'contact', label: 'Business', icon: <Building size={14} /> },
-                  { id: 'data', label: 'Data', icon: <Plus size={14} /> },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveSettingsTab(tab.id as any)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${
-                      activeSettingsTab === tab.id 
-                        ? 'bg-white text-safari-900 shadow-sm ring-1 ring-safari-200' 
-                        : 'text-safari-400 hover:text-safari-600 hover:bg-white/50'
-                    }`}
-                  >
-                    {tab.icon}
-                    {tab.label}
-                  </button>
-                ))}
+                <p className="text-safari-500 font-medium">Control brand identity, business rules, and system settings.</p>
               </div>
             </header>
 
-            {activeSettingsTab === 'general' && (
+            <div className="flex items-center gap-1 p-1 bg-safari-50 rounded-xl border border-safari-100 overflow-x-auto no-scrollbar w-full shadow-inner">
+              {[
+                profile?.is_super_user && { id: 'system', label: 'System', icon: <ShieldCheck size={14} /> },
+                profile?.is_super_user && { id: 'landing', label: 'Landing Page', icon: <LayoutDashboard size={14} /> },
+                profile?.is_super_user && { id: 'data', label: 'Global System Log', icon: <Database size={14} /> },
+                { id: 'visuals', label: 'Agency Branding', icon: <Palette size={14} /> },
+                { id: 'business', label: 'Agency & Finance', icon: <Building size={14} /> },
+              ].filter(Boolean).map((tab: any) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveSettingsTab(tab.id)}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                    activeSettingsTab === tab.id 
+                      ? 'bg-white text-safari-900 shadow-sm ring-1 ring-safari-200' 
+                      : 'text-safari-400 hover:text-safari-600 hover:bg-white/50'
+                  }`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {activeSettingsTab === 'system' && profile?.is_super_user && (
               <div className="space-y-6 animate-fadeIn">
-                <section className="bg-white rounded-2xl shadow-sm border border-safari-100 p-8">
+                <section className="bg-white rounded-xl shadow-sm border border-safari-100 p-8">
                   <div className="flex items-center justify-between mb-8">
                     <div>
-                      <h3 className="text-lg font-bold text-safari-900 flex items-center gap-2">
-                        <Monitor className="text-safari-500" size={20} />
-                        Platform Identity
+                      <h3 className="text-lg font-bold text-safari-900 flex items-center gap-2 italic">
+                        <ShieldCheck className="text-safari-500" size={20} />
+                        Global System Identity
                       </h3>
-                      <p className="text-sm text-safari-500 font-medium">Global brand markers and active status.</p>
+                      <p className="text-sm text-safari-500 font-medium">Primary platform markers used across the entire ecosystem.</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-                    <div className="space-y-2">
-                       <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Application Name</label>
-                       <input 
-                         type="text" 
-                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-2xl font-bold text-lg text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
-                         value={branding.appName || ''} 
-                         onChange={(e) => setBranding({...branding, appName: e.target.value})}
-                         placeholder="SafariPlanner.ai"
-                       />
-                    </div>
-                    <div className="space-y-2">
-                       <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Brand Tagline</label>
-                       <input 
-                         type="text" 
-                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-2xl font-bold text-lg text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
-                         value={branding.appTagline || ''} 
-                         onChange={(e) => setBranding({...branding, appTagline: e.target.value})}
-                         placeholder="Curation Meets Intelligence"
-                       />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-6 bg-safari-50 rounded-2xl border border-safari-100 shadow-inner">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-safari-600 shadow-sm border border-safari-100">
-                        <LayoutDashboard size={20} />
-                      </div>
-                      <div>
-                        <p className="font-bold text-safari-900">Marketing Landing Page</p>
-                        <p className="text-xs text-safari-500 font-medium">Toggle the public-facing promotional experience.</p>
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => handleToggleLanding(!isLandingEnabled)}
-                      className={`w-14 h-8 rounded-full transition-all relative ${isLandingEnabled ? 'bg-safari-600' : 'bg-safari-200'}`}
-                    >
-                      <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-md ${isLandingEnabled ? 'left-7' : 'left-1'}`} />
-                    </button>
-                  </div>
-                </section>
-
-                <section className="bg-white rounded-2xl shadow-sm border border-safari-100 p-8">
-                  <h3 className="text-sm font-black uppercase tracking-widest text-safari-400 mb-6 flex items-center gap-2 italic">
-                    <Share2 size={14} /> Global Inquiry Trigger
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="p-6 bg-safari-50 rounded-2xl border border-safari-100">
-                      <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest mb-3 ml-1">WhatsApp Integration (Intl. Format)</label>
-                      <div className="flex gap-3">
-                        <div className="flex items-center justify-center w-14 h-14 bg-white rounded-xl border border-safari-100 text-safari-600 shadow-sm">
-                          <Phone size={24} />
-                        </div>
-                        <input 
-                          type="text" 
-                          className="flex-1 p-4 bg-white border border-safari-100 rounded-xl font-black text-xl text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm transition-all" 
-                          value={branding.whatsappNumber || ''} 
-                          onChange={(e) => setBranding({...branding, whatsappNumber: e.target.value})}
-                          placeholder="+254700000000"
-                        />
-                      </div>
-                      <p className="text-[10px] text-safari-400 mt-3 ml-1 font-medium italic">* This number will be used for all "Talk to an Expert" buttons across the landing page and app.</p>
-                    </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <div className="space-y-2">
+       <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Application Name</label>
+       <input 
+         type="text" 
+         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-lg font-bold text-lg text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
+         value={branding.appName || ''} 
+         onChange={(e) => setBranding({...branding, appName: e.target.value})}
+         placeholder="SafariPlanner.ai"
+       />
+    </div>
+    <div className="space-y-2">
+       <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Brand Tagline</label>
+       <input 
+         type="text" 
+         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-lg font-bold text-lg text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
+         value={branding.appTagline || ''} 
+         onChange={(e) => setBranding({...branding, appTagline: e.target.value})}
+         placeholder="Curation Meets Intelligence"
+       />
+    </div>
                   </div>
                 </section>
               </div>
@@ -1420,7 +1447,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
             {activeSettingsTab === 'visuals' && (
               <div className="space-y-6 animate-fadeIn">
-                <section className="bg-white rounded-2xl shadow-sm border border-safari-100 p-8">
+                <section className="bg-white rounded-xl shadow-sm border border-safari-100 p-8">
                   <h3 className="text-lg font-bold text-safari-900 mb-8 flex items-center gap-2 italic">
                     <Palette className="text-safari-500" size={20} />
                     Brand Color System
@@ -1429,10 +1456,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-12">
                     <div className="space-y-4">
                        <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Primary Brand Color</label>
-                       <div className="flex gap-4 p-4 bg-safari-50 rounded-2xl border border-safari-100 items-center">
+                       <div className="flex gap-4 p-4 bg-safari-50 rounded-lg border border-safari-100 items-center">
                          <input 
                            type="color" 
-                           className="w-16 h-16 rounded-xl cursor-pointer border-none p-0 outline-none shadow-sm hover:scale-105 transition-transform" 
+                           className="w-16 h-16 rounded-lg cursor-pointer border-none p-0 outline-none shadow-sm hover:scale-105 transition-transform" 
                            value={branding?.primaryColor || ''} 
                            onChange={(e) => setBranding({...branding, primaryColor: e.target.value})}
                          />
@@ -1448,10 +1475,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                     </div>
                     <div className="space-y-4">
                        <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Secondary Accent</label>
-                       <div className="flex gap-4 p-4 bg-safari-50 rounded-2xl border border-safari-100 items-center">
+                       <div className="flex gap-4 p-4 bg-safari-50 rounded-lg border border-safari-100 items-center">
                          <input 
                            type="color" 
-                           className="w-16 h-16 rounded-xl cursor-pointer border-none p-0 outline-none shadow-sm hover:scale-105 transition-transform" 
+                           className="w-16 h-16 rounded-lg cursor-pointer border-none p-0 outline-none shadow-sm hover:scale-105 transition-transform" 
                            value={branding?.secondaryColor || ''} 
                            onChange={(e) => setBranding({...branding, secondaryColor: e.target.value})}
                          />
@@ -1478,7 +1505,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                             primaryColor: palette.primary, 
                             secondaryColor: palette.secondary 
                           })}
-                          className={`p-5 rounded-2xl border transition-all text-left flex flex-col gap-4 group relative overflow-hidden ${
+                          className={`p-5 rounded-lg border transition-all text-left flex flex-col gap-4 group relative overflow-hidden ${
                             branding.primaryColor === palette.primary 
                               ? 'bg-white border-safari-400 shadow-xl ring-2 ring-safari-500/10' 
                               : 'bg-safari-50 border-safari-100 hover:border-safari-200'
@@ -1498,20 +1525,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   </div>
                 </section>
 
-                <section className="bg-white rounded-2xl shadow-sm border border-safari-100 p-8">
+                <section className="bg-white rounded-xl shadow-sm border border-safari-100 p-8">
                   <h3 className="text-lg font-bold text-safari-900 mb-8 flex items-center gap-2 italic">
                     <Type className="text-safari-500" size={20} />
                     Typography Scale
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {['title', 'body', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].map((level) => (
-                      <div key={level} className="p-5 bg-safari-50 rounded-2xl border border-safari-100 space-y-4 shadow-inner">
+                      <div key={level} className="p-5 bg-safari-50 rounded-lg border border-safari-100 space-y-4 shadow-inner">
                         <p className="text-[10px] font-black uppercase text-safari-600 tracking-wider flex items-center gap-2">
                            {level === 'title' ? 'GLOBAL TITLE' : level === 'body' ? 'PARAGRAPH' : `${level.toUpperCase()} SCALE`}
                         </p>
                         <div className="space-y-3">
                           <select 
-                            className="w-full p-3 bg-white border border-safari-100 rounded-xl font-bold text-xs outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm"
+                            className="w-full p-3 bg-white border border-safari-100 rounded-lg font-bold text-xs outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm"
                             value={(branding as any)[`${level}Font`] || ''}
                             onChange={(e) => setBranding({...branding, [`${level}Font`]: e.target.value})}
                           >
@@ -1522,13 +1549,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                           <div className="grid grid-cols-2 gap-2">
                             <input 
                               type="text" 
-                              className="w-full p-3 bg-white border border-safari-100 rounded-xl font-bold text-xs text-center shadow-sm"
+                              className="w-full p-3 bg-white border border-safari-100 rounded-lg font-bold text-xs text-center shadow-sm"
                               value={(branding as any)[`${level}FontSize`] || ''}
                               onChange={(e) => setBranding({...branding, [`${level}FontSize`]: e.target.value})}
                               placeholder="Size"
                             />
                             <select 
-                              className="w-full p-3 bg-white border border-safari-100 rounded-xl font-bold text-xs shadow-sm"
+                              className="w-full p-3 bg-white border border-safari-100 rounded-lg font-bold text-xs shadow-sm"
                               value={(branding as any)[`${level}FontWeight`] || ''}
                               onChange={(e) => setBranding({...branding, [`${level}FontWeight`]: e.target.value})}
                             >
@@ -1543,7 +1570,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                           {level === 'body' && (
                             <input 
                               type="text" 
-                              className="w-full p-3 bg-white border border-safari-100 rounded-xl font-bold text-xs text-center shadow-sm"
+                              className="w-full p-3 bg-white border border-safari-100 rounded-lg font-bold text-xs text-center shadow-sm"
                               value={branding.bodyLineHeight || ''}
                               onChange={(e) => setBranding({...branding, bodyLineHeight: e.target.value})}
                               placeholder="Line Height (e.g. 1.6)"
@@ -1557,9 +1584,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               </div>
             )}
 
-            {activeSettingsTab === 'landing' && (
+            {activeSettingsTab === 'landing' && profile?.is_super_user && (
               <div className="space-y-6 animate-fadeIn">
-                <section className="bg-white rounded-2xl shadow-sm border border-safari-100 p-8">
+                <section className="bg-white rounded-xl shadow-sm border border-safari-100 p-8">
                   <h3 className="text-lg font-bold text-safari-900 mb-8 flex items-center gap-2 italic">
                     <ImageIcon className="text-safari-500" size={20} />
                     Hero Experience
@@ -1569,83 +1596,103 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                        <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Hero Title</label>
                        <input 
                          type="text" 
-                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-2xl font-bold text-lg text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20" 
-                         value={branding.heroTitle || ''} 
-                         onChange={(e) => setBranding({...branding, heroTitle: e.target.value})}
+                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-lg font-bold text-lg text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20" 
+                         value={globalBranding.heroTitle || ''} 
+                         onChange={(e) => setGlobalBranding({...globalBranding, heroTitle: e.target.value})}
                          placeholder="The Art of the Safari, Decoded."
                        />
                     </div>
                     <div className="space-y-2">
                        <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Description</label>
                        <textarea 
-                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-2xl font-medium text-safari-800 outline-none focus:ring-2 focus:ring-safari-500/20 h-32 resize-none" 
-                         value={branding.heroDescription || ''} 
-                         onChange={(e) => setBranding({...branding, heroDescription: e.target.value})}
+                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-lg font-medium text-safari-800 outline-none focus:ring-2 focus:ring-safari-500/20 h-32 resize-none" 
+                         value={globalBranding.heroDescription || ''} 
+                         onChange={(e) => setGlobalBranding({...globalBranding, heroDescription: e.target.value})}
                          placeholder="Engage your visitors with a powerful brand story..."
                        />
                     </div>
                     <div className="space-y-2">
-                       <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Background Image URL</label>
-                       <div className="flex gap-4 p-2 bg-safari-50 rounded-2xl border border-safari-100 items-center">
-                         <div className="w-16 h-16 rounded-xl overflow-hidden bg-white border border-safari-100 shadow-sm flex-shrink-0">
-                           <img src={branding.heroImage} alt="Hero" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                       <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Main Landing Banner</label>
+                       <div className="flex gap-4 p-2 bg-safari-50 rounded-lg border border-safari-100 items-center">
+                         <label className="w-16 h-16 rounded-lg overflow-hidden bg-white border border-safari-100 shadow-sm flex-shrink-0 cursor-pointer block relative group">
+                           {globalBranding.heroImage && <img src={globalBranding.heroImage} alt="Hero" className="w-full h-full object-cover" referrerPolicy="no-referrer" />}
+                           {!globalBranding.heroImage && <div className="w-full h-full flex items-center justify-center text-safari-300"><Upload size={20} /></div>}
+                           <input 
+                             type="file" 
+                             className="hidden" 
+                             accept="image/*"
+                             onChange={handleHeroImageUpload}
+                           />
+                         </label>
+                         <div className="flex-1 space-y-1">
+                            <label className="flex items-center gap-2 text-safari-900 font-bold text-xs cursor-pointer hover:text-safari-600 transition-colors">
+                               <Upload size={14} /> Upload New Image
+                               <input 
+                                 type="file" 
+                                 className="hidden" 
+                                 accept="image/*"
+                                 onChange={handleHeroImageUpload}
+                               />
+                            </label>
+                            <p className="text-[10px] text-safari-400">Recommended size: 1920x1080px</p>
                          </div>
-                         <input 
-                           type="text" 
-                           className="flex-1 bg-transparent font-medium text-xs text-safari-600 outline-none p-2" 
-                           value={branding.heroImage || ''} 
-                           onChange={(e) => setBranding({...branding, heroImage: e.target.value})}
-                           placeholder="https://images.unsplash.com/..."
-                         />
+                         {globalBranding.heroImage && (
+                           <button 
+                             onClick={() => setGlobalBranding({ ...globalBranding, heroImage: '' })}
+                             className="text-red-400 hover:text-red-600 p-2"
+                           >
+                             <Trash2 size={16} />
+                           </button>
+                         )}
                        </div>
                     </div>
                   </div>
                 </section>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <section className="bg-white rounded-2xl shadow-sm border border-safari-100 p-8 space-y-6">
+                  <section className="bg-white rounded-xl shadow-sm border border-safari-100 p-8 space-y-6">
                     <div className="flex justify-between items-center">
                       <h3 className="text-lg font-bold text-safari-900 flex items-center gap-2 italic">
                         <HelpCircle className="text-safari-500" size={20} />
                         FAQ Management
                       </h3>
                       <button 
-                        onClick={() => setBranding({...branding, faqs: [...(branding.faqs || []), { q: '', a: '' }]})}
-                        className="p-2 bg-safari-900 text-white rounded-xl hover:bg-black transition-all shadow-md"
+                        onClick={() => setGlobalBranding({...globalBranding, faqs: [...(globalBranding.faqs || []), { q: '', a: '' }]})}
+                        className="p-2 bg-safari-900 text-white rounded-lg hover:bg-black transition-all shadow-md"
                       >
                         <Plus size={18} />
                       </button>
                     </div>
                     <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 no-scrollbar">
-                      {(branding.faqs || []).map((faq, idx) => (
-                        <div key={idx} className="p-6 bg-safari-50 rounded-2xl border border-safari-100 space-y-4 relative group animate-fadeIn">
+                      {(globalBranding.faqs || []).map((faq, idx) => (
+                        <div key={idx} className="p-6 bg-safari-50 rounded-xl border border-safari-100 space-y-4 relative group animate-fadeIn">
                           <button 
                             onClick={() => {
-                              const newFaqs = [...(branding.faqs || [])];
+                              const newFaqs = [...(globalBranding.faqs || [])];
                               newFaqs.splice(idx, 1);
-                              setBranding({...branding, faqs: newFaqs});
+                              setGlobalBranding({...globalBranding, faqs: newFaqs});
                             }}
                             className="absolute top-4 right-4 text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
                           >
                             <Trash2 size={16} />
                           </button>
                           <input 
-                            className="w-full bg-white p-3 rounded-xl border border-safari-100 font-bold text-sm outline-none shadow-sm"
+                            className="w-full bg-white p-3 rounded-lg border border-safari-100 font-bold text-sm outline-none shadow-sm"
                             value={faq.q}
                             onChange={(e) => {
-                              const newFaqs = [...(branding.faqs || [])];
+                              const newFaqs = [...(globalBranding.faqs || [])];
                               newFaqs[idx] = { ...newFaqs[idx], q: e.target.value };
-                              setBranding({...branding, faqs: newFaqs});
+                              setGlobalBranding({...globalBranding, faqs: newFaqs});
                             }}
                             placeholder="Question"
                           />
                           <textarea 
-                            className="w-full bg-white p-3 rounded-xl border border-safari-100 font-medium text-xs outline-none shadow-sm h-24 resize-none"
+                            className="w-full bg-white p-3 rounded-lg border border-safari-100 font-medium text-xs outline-none shadow-sm h-24 resize-none"
                             value={faq.a}
                             onChange={(e) => {
-                              const newFaqs = [...(branding.faqs || [])];
+                              const newFaqs = [...(globalBranding.faqs || [])];
                               newFaqs[idx] = { ...newFaqs[idx], a: e.target.value };
-                              setBranding({...branding, faqs: newFaqs});
+                              setGlobalBranding({...globalBranding, faqs: newFaqs});
                             }}
                             placeholder="Answer"
                           />
@@ -1654,27 +1701,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                     </div>
                   </section>
 
-                  <section className="bg-white rounded-2xl shadow-sm border border-safari-100 p-8 space-y-6">
+                  <section className="bg-white rounded-xl shadow-sm border border-safari-100 p-8 space-y-6">
                     <div className="flex justify-between items-center">
                       <h3 className="text-lg font-bold text-safari-900 flex items-center gap-2 italic">
                         <Quote className="text-safari-500" size={20} />
                         Social Proof
                       </h3>
                       <button 
-                        onClick={() => setBranding({...branding, testimonials: [...(branding.testimonials || []), { name: '', role: '', text: '', stars: 5 }]})}
-                        className="p-2 bg-safari-900 text-white rounded-xl hover:bg-black transition-all shadow-md"
+                        onClick={() => setGlobalBranding({...globalBranding, testimonials: [...(globalBranding.testimonials || []), { name: '', role: '', text: '', stars: 5 }]})}
+                        className="p-2 bg-safari-900 text-white rounded-lg hover:bg-black transition-all shadow-md"
                       >
                         <Plus size={18} />
                       </button>
                     </div>
                     <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 no-scrollbar">
-                      {(branding.testimonials || []).map((t, idx) => (
-                        <div key={idx} className="p-6 bg-safari-50 rounded-2xl border border-safari-100 space-y-4 relative group animate-fadeIn">
+                      {(globalBranding.testimonials || []).map((t, idx) => (
+                        <div key={idx} className="p-6 bg-safari-50 rounded-xl border border-safari-100 space-y-4 relative group animate-fadeIn">
                           <button 
                             onClick={() => {
-                              const newT = [...(branding.testimonials || [])];
+                              const newT = [...(globalBranding.testimonials || [])];
                               newT.splice(idx, 1);
-                              setBranding({...branding, testimonials: newT});
+                              setGlobalBranding({...globalBranding, testimonials: newT});
                             }}
                             className="absolute top-4 right-4 text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
                           >
@@ -1682,33 +1729,33 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                           </button>
                           <div className="grid grid-cols-2 gap-4">
                             <input 
-                              className="w-full bg-white p-3 rounded-xl border border-safari-100 font-bold text-sm outline-none shadow-sm"
+                              className="w-full bg-white p-3 rounded-lg border border-safari-100 font-bold text-sm outline-none shadow-sm"
                               value={t.name}
                               onChange={(e) => {
-                                const newT = [...(branding.testimonials || [])];
+                                const newT = [...(globalBranding.testimonials || [])];
                                 newT[idx] = { ...newT[idx], name: e.target.value };
-                                setBranding({...branding, testimonials: newT});
+                                setGlobalBranding({...globalBranding, testimonials: newT});
                               }}
                               placeholder="Client Name"
                             />
                             <input 
-                              className="w-full bg-white p-3 rounded-xl border border-safari-100 font-bold text-sm outline-none shadow-sm"
+                              className="w-full bg-white p-3 rounded-lg border border-safari-100 font-bold text-sm outline-none shadow-sm"
                               value={t.role}
                               onChange={(e) => {
-                                const newT = [...(branding.testimonials || [])];
+                                const newT = [...(globalBranding.testimonials || [])];
                                 newT[idx] = { ...newT[idx], role: e.target.value };
-                                setBranding({...branding, testimonials: newT});
+                                setGlobalBranding({...globalBranding, testimonials: newT});
                               }}
                               placeholder="Client Role"
                             />
                           </div>
                           <textarea 
-                            className="w-full bg-white p-3 rounded-xl border border-safari-100 font-medium text-xs outline-none shadow-sm h-24 resize-none italic"
+                            className="w-full bg-white p-3 rounded-lg border border-safari-100 font-medium text-xs outline-none shadow-sm h-24 resize-none italic"
                             value={t.text}
                             onChange={(e) => {
-                              const newT = [...(branding.testimonials || [])];
+                              const newT = [...(globalBranding.testimonials || [])];
                               newT[idx] = { ...newT[idx], text: e.target.value };
-                              setBranding({...branding, testimonials: newT});
+                              setGlobalBranding({...globalBranding, testimonials: newT});
                             }}
                             placeholder="Testimonial text..."
                           />
@@ -1720,29 +1767,45 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               </div>
             )}
 
-            {activeSettingsTab === 'contact' && (
+            {activeSettingsTab === 'business' && (
               <div className="space-y-6 animate-fadeIn">
-                <section className="bg-white rounded-2xl shadow-sm border border-safari-100 p-8">
+                <section className="bg-white rounded-xl shadow-sm border border-safari-100 p-8">
                   <h3 className="text-lg font-bold text-safari-900 mb-8 flex items-center gap-2 italic">
                     <Building className="text-safari-500" size={20} />
-                    Corporate & Financial Configuration
+                    Agency & Finance Configuration
                   </h3>
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-                          <div className="space-y-2">
-                       <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Legal Company/Property Name</label>
+                    <div className="space-y-2">
+                       <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Legal Agency/Property Name</label>
                        <input 
                          type="text" 
-                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-2xl font-bold text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
-                         value={branding.agencyName || ''} 
+                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-lg font-bold text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
+                         value={branding.agencyName || branding.appName || ''} 
                          onChange={(e) => setBranding({...branding, agencyName: e.target.value})}
                          placeholder="Legal Entity Name"
                        />
                     </div>
                     <div className="space-y-2">
+                       <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">WhatsApp Integration (Intl. Format)</label>
+                       <div className="flex gap-3">
+                         <div className="flex items-center justify-center w-12 h-12 bg-white rounded-lg border border-safari-100 text-safari-600 shadow-sm">
+                           <Phone size={18} />
+                         </div>
+                         <input 
+                           type="text" 
+                           className="flex-1 p-3 bg-safari-50 border border-safari-100 rounded-lg font-bold text-lg text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm transition-all" 
+                           value={branding.whatsappNumber || ''} 
+                           onChange={(e) => setBranding({...branding, whatsappNumber: e.target.value})}
+                           placeholder="+254700000000"
+                         />
+                       </div>
+                    </div>
+                    <div className="space-y-2">
                        <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Support Email</label>
                        <input 
                          type="email" 
-                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-2xl font-bold text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
+                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-lg font-bold text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
                          value={branding.contactEmail || ''} 
                          onChange={(e) => setBranding({...branding, contactEmail: e.target.value})}
                          placeholder="support@agency.com"
@@ -1752,7 +1815,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                        <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Finance Email (Billing CC)</label>
                        <input 
                          type="email" 
-                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-2xl font-bold text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
+                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-lg font-bold text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
                          value={branding.financeEmail || ''} 
                          onChange={(e) => setBranding({...branding, financeEmail: e.target.value})}
                          placeholder="finance@agency.com"
@@ -1762,30 +1825,204 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                        <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Office Contact Phone</label>
                        <input 
                          type="text" 
-                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-2xl font-bold text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
+                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-lg font-bold text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
                          value={branding.contactPhone || ''} 
                          onChange={(e) => setBranding({...branding, contactPhone: e.target.value})}
                          placeholder="Local or International format"
                        />
                     </div>
-                    <div className="md:col-span-2 space-y-2">
-                       <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Physical Address & Corporate Bio</label>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                    <div className="space-y-2">
+                       <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Physical Office Address</label>
                        <textarea 
-                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-2xl font-medium text-safari-800 outline-none focus:ring-2 focus:ring-safari-500/20 h-24 resize-none shadow-sm" 
+                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-lg font-medium text-safari-800 outline-none focus:ring-2 focus:ring-safari-500/20 h-32 resize-none shadow-sm" 
                          value={branding.contactAddress || ''} 
                          onChange={(e) => setBranding({...branding, contactAddress: e.target.value})}
-                         placeholder="Headquarters address and brief agency description..."
+                         placeholder="Full office location details..."
                        />
                     </div>
+                    <div className="space-y-2">
+                        <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Agency Biography / Description</label>
+                        <textarea 
+                          className="w-full p-4 bg-safari-50 border border-safari-100 rounded-lg font-medium text-safari-800 outline-none focus:ring-2 focus:ring-safari-500/20 h-32 resize-none shadow-sm" 
+                          value={branding.agencyDescription || ''} 
+                          onChange={(e) => setBranding({...branding, agencyDescription: e.target.value})}
+                          placeholder="Tell travelers about your agency's mission and expertise..."
+                        />
+                     </div>
                   </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                    <div className="space-y-2">
+                       <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Year Established</label>
+                       <input 
+                         type="text" 
+                         className="w-full p-4 bg-safari-50 border border-safari-100 rounded-lg font-bold text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
+                         value={branding.establishedYear || ''} 
+                         onChange={(e) => setBranding({...branding, establishedYear: e.target.value})}
+                         placeholder="e.g. 2012"
+                       />
+                    </div>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between ml-1">
+                        <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">Agency Statistics</label>
+                        <button 
+                          onClick={() => setBranding({
+                            ...branding, 
+                            statistics: [...(branding.statistics || []), { label: '', value: '', iconType: 'heart' }]
+                          })}
+                          className="text-[10px] font-black uppercase text-safari-600 hover:text-safari-900 flex items-center gap-1 bg-safari-50 px-2 py-1 rounded-md border border-safari-100 shadow-sm"
+                        >
+                          <Plus size={12} /> Add Stat
+                        </button>
+                      </div>
+                      <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 no-scrollbar">
+                        {(branding.statistics || []).map((stat, idx) => (
+                          <div key={idx} className="p-4 bg-safari-50 border border-safari-100 rounded-lg space-y-3 relative group">
+                            <button 
+                              onClick={() => {
+                                const newStats = [...(branding.statistics || [])];
+                                newStats.splice(idx, 1);
+                                setBranding({ ...branding, statistics: newStats });
+                              }}
+                              className="absolute top-2 right-2 text-safari-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                            <div className="grid grid-cols-2 gap-2">
+                              <input 
+                                className="w-full bg-white p-2 rounded border border-safari-100 font-bold text-xs outline-none"
+                                value={stat.value}
+                                onChange={(e) => {
+                                  const newStats = [...(branding.statistics || [])];
+                                  newStats[idx] = { ...stat, value: e.target.value };
+                                  setBranding({...branding, statistics: newStats});
+                                }}
+                                placeholder="Value (e.g. 1,200+)"
+                              />
+                              <input 
+                                className="w-full bg-white p-2 rounded border border-safari-100 font-bold text-xs outline-none"
+                                value={stat.label}
+                                onChange={(e) => {
+                                  const newStats = [...(branding.statistics || [])];
+                                  newStats[idx] = { ...stat, label: e.target.value };
+                                  setBranding({...branding, statistics: newStats});
+                                }}
+                                placeholder="Label (e.g. Happy Clients)"
+                              />
+                            </div>
+                            <select 
+                              className="w-full bg-white p-2 rounded border border-safari-100 font-bold text-[10px] outline-none"
+                              value={stat.iconType}
+                              onChange={(e) => {
+                                const newStats = [...(branding.statistics || [])];
+                                newStats[idx] = { ...stat, iconType: e.target.value as any };
+                                setBranding({...branding, statistics: newStats});
+                              }}
+                            >
+                              <option value="heart">Heart Icon</option>
+                              <option value="globe">Globe Icon</option>
+                              <option value="shield">Shield Icon</option>
+                              <option value="award">Award Icon</option>
+                              <option value="users">Users Icon</option>
+                              <option value="star">Star Icon</option>
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6 mb-10">
+                    <h4 className="text-[10px] font-black uppercase text-safari-400 tracking-widest ml-1">Visual Banner Settings</h4>
+                    <div className="p-6 bg-safari-50 rounded-lg border border-safari-100">
+                      <div className="flex flex-col md:flex-row gap-6 items-start">
+                        <div className="w-full md:w-1/3 aspect-video bg-white rounded-lg border border-safari-100 overflow-hidden relative group">
+                          {branding.heroImage ? (
+                            <img src={branding.heroImage} className="w-full h-full object-cover" alt="Banner Preview" />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-safari-300 gap-2">
+                              <ImageIcon size={32} />
+                              <span className="text-[10px] font-bold">No Image Uploaded</span>
+                            </div>
+                          )}
+                          <label className="absolute inset-0 bg-safari-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              accept="image/*"
+                              onChange={handleHeroImageUpload}
+                            />
+                            <span className="text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                              <Upload size={14} /> Click to Upload
+                            </span>
+                          </label>
+                        </div>
+                        <div className="flex-1 space-y-4">
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest mb-2">Agency Hero Banner</label>
+                              <div className="flex gap-3">
+                                <label className="flex items-center gap-2 px-6 py-3 bg-safari-900 text-white rounded-lg font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-md cursor-pointer">
+                                  <Upload size={16} /> 
+                                  Upload New Image
+                                  <input 
+                                    type="file" 
+                                    className="hidden" 
+                                    accept="image/*"
+                                    onChange={handleHeroImageUpload}
+                                  />
+                                </label>
+                                {branding.heroImage && (
+                                  <button 
+                                    onClick={() => setBranding({ ...branding, heroImage: '' })}
+                                    className="flex items-center gap-2 px-6 py-3 bg-white border border-safari-200 text-safari-600 rounded-lg font-black text-xs uppercase tracking-widest hover:bg-safari-50 transition-all"
+                                  >
+                                    <Trash2 size={16} /> Clear
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-safari-400 font-medium italic leading-relaxed">
+                              Upload a high-quality landscape image (Recommended: 1920x1080). This image will serve as your agency's professional background on the landing page and partner profiles.
+                            </p>
+                            <div className="grid grid-cols-1 gap-4 pt-4">
+                              <div className="space-y-1">
+                                <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Landing Hero Title</label>
+                                <input 
+                                  type="text" 
+                                  className="w-full p-3 bg-white border border-safari-100 rounded-lg font-bold text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 text-xs shadow-sm" 
+                                  value={branding.heroTitle || ''} 
+                                  onChange={(e) => setBranding({...branding, heroTitle: e.target.value})}
+                                  placeholder="e.g. Crafting Unforgettable African Odysseys"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Landing Hero Subtitle / Description</label>
+                                <textarea 
+                                  className="w-full p-3 bg-white border border-safari-100 rounded-lg font-medium text-safari-800 outline-none focus:ring-2 focus:ring-safari-500/20 text-xs h-20 resize-none shadow-sm" 
+                                  value={branding.heroDescription || ''} 
+                                  onChange={(e) => setBranding({...branding, heroDescription: e.target.value})}
+                                  placeholder="Introduce your agency's unique value in one or two sentences..."
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="pt-8 border-t border-safari-50">
-                    <h4 className="text-[10px] font-black uppercase text-safari-400 mb-6 tracking-widest">Financial Defaults</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <h4 className="text-[10px] font-black uppercase text-safari-400 mb-6 tracking-widest">Financial & Rates Configuration</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
                       <div className="space-y-2">
                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Global Markup (%)</label>
                          <input 
                            type="number" 
-                           className="w-full p-4 bg-safari-50 border border-safari-100 rounded-2xl font-bold text-xl text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
+                           className="w-full p-4 bg-safari-50 border border-safari-100 rounded-lg font-bold text-xl text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
                            value={branding.defaultMarkup || 0}
                            onChange={(e) => setBranding({...branding, defaultMarkup: Number(e.target.value)})}
                          />
@@ -1794,10 +2031,169 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Standard Tax/VAT (%)</label>
                          <input 
                            type="number" 
-                           className="w-full p-4 bg-safari-50 border border-safari-100 rounded-2xl font-bold text-xl text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
+                           className="w-full p-4 bg-safari-50 border border-safari-100 rounded-lg font-bold text-xl text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
                            value={branding.defaultTax || 0}
                            onChange={(e) => setBranding({...branding, defaultTax: Number(e.target.value)})}
                          />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between ml-1">
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">Park Fees (Agency Pricing)</label>
+                          <button 
+                            onClick={() => setBranding({
+                              ...branding, 
+                              parkFees: [...(branding.parkFees || []), { park: '', citizen: 0, resident: 0, non_resident: 0 }]
+                            })}
+                            className="text-[10px] font-black uppercase text-safari-600 hover:text-safari-900 flex items-center gap-1 bg-safari-50 px-2 py-1 rounded-md border border-safari-100 shadow-sm"
+                          >
+                            <Plus size={12} /> Add Park
+                          </button>
+                        </div>
+                        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
+                          {(branding.parkFees || []).map((fee, idx) => (
+                            <div key={idx} className="p-4 bg-white border border-safari-100 rounded-lg shadow-sm space-y-3 animate-fadeIn relative group">
+                              <button 
+                                onClick={() => {
+                                  const newList = [...(branding.parkFees || [])];
+                                  newList.splice(idx, 1);
+                                  setBranding({ ...branding, parkFees: newList });
+                                }}
+                                className="absolute top-2 right-2 text-safari-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                              <div className="space-y-1">
+                                <label className="text-[9px] font-bold text-safari-400 uppercase tracking-tighter">Park Name</label>
+                                <input 
+                                  type="text" 
+                                  className="w-full p-2 bg-safari-50 border border-safari-100 rounded font-bold text-sm text-safari-900 outline-none" 
+                                  value={fee.park}
+                                  onChange={(e) => {
+                                    const newList = [...(branding.parkFees || [])];
+                                    newList[idx] = { ...fee, park: e.target.value };
+                                    setBranding({ ...branding, parkFees: newList });
+                                  }}
+                                  placeholder="e.g. Masai Mara"
+                                />
+                              </div>
+                              <div className="grid grid-cols-3 gap-2">
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-bold text-safari-400 uppercase tracking-tighter">Citizen</label>
+                                  <input 
+                                    type="number" 
+                                    className="w-full p-2 bg-safari-50 border border-safari-100 rounded font-bold text-sm text-safari-900 outline-none" 
+                                    value={fee.citizen}
+                                    onChange={(e) => {
+                                      const newList = [...(branding.parkFees || [])];
+                                      newList[idx] = { ...fee, citizen: Number(e.target.value) };
+                                      setBranding({ ...branding, parkFees: newList });
+                                    }}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-bold text-safari-400 uppercase tracking-tighter">Resident</label>
+                                  <input 
+                                    type="number" 
+                                    className="w-full p-2 bg-safari-50 border border-safari-100 rounded font-bold text-sm text-safari-900 outline-none" 
+                                    value={fee.resident}
+                                    onChange={(e) => {
+                                      const newList = [...(branding.parkFees || [])];
+                                      newList[idx] = { ...fee, resident: Number(e.target.value) };
+                                      setBranding({ ...branding, parkFees: newList });
+                                    }}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-bold text-safari-400 uppercase tracking-tighter">Non-Res</label>
+                                  <input 
+                                    type="number" 
+                                    className="w-full p-2 bg-safari-50 border border-safari-100 rounded font-bold text-sm text-safari-900 outline-none" 
+                                    value={fee.non_resident}
+                                    onChange={(e) => {
+                                      const newList = [...(branding.parkFees || [])];
+                                      newList[idx] = { ...fee, non_resident: Number(e.target.value) };
+                                      setBranding({ ...branding, parkFees: newList });
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {(branding.parkFees || []).length === 0 && (
+                            <div className="p-8 border border-dashed border-safari-100 rounded-lg text-center">
+                              <p className="text-xs text-safari-400 font-medium">No custom park fees defined.</p>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-safari-400 font-medium italic">Define overrides for official park entry fees used in your itineraries.</p>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between ml-1">
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">Transport Rates (Agency Pricing)</label>
+                          <button 
+                            onClick={() => setBranding({
+                              ...branding, 
+                              transportRates: [...(branding.transportRates || []), { type: '', rate: 0 }]
+                            })}
+                            className="text-[10px] font-black uppercase text-safari-600 hover:text-safari-900 flex items-center gap-1 bg-safari-50 px-2 py-1 rounded-md border border-safari-100 shadow-sm"
+                          >
+                            <Plus size={12} /> Add Rate
+                          </button>
+                        </div>
+                        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
+                          {(branding.transportRates || []).map((rate, idx) => (
+                            <div key={idx} className="p-4 bg-white border border-safari-100 rounded-lg shadow-sm space-y-3 animate-fadeIn relative group">
+                              <button 
+                                onClick={() => {
+                                  const newList = [...(branding.transportRates || [])];
+                                  newList.splice(idx, 1);
+                                  setBranding({ ...branding, transportRates: newList });
+                                }}
+                                className="absolute top-2 right-2 text-safari-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-bold text-safari-400 uppercase tracking-tighter">Vehicle Type</label>
+                                  <input 
+                                    type="text" 
+                                    className="w-full p-2 bg-safari-50 border border-safari-100 rounded font-bold text-sm text-safari-900 outline-none" 
+                                    value={rate.type}
+                                    onChange={(e) => {
+                                      const newList = [...(branding.transportRates || [])];
+                                      newList[idx] = { ...rate, type: e.target.value };
+                                      setBranding({ ...branding, transportRates: newList });
+                                    }}
+                                    placeholder="e.g. Land Cruiser"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-bold text-safari-400 uppercase tracking-tighter">Daily Rate ($)</label>
+                                  <input 
+                                    type="number" 
+                                    className="w-full p-2 bg-safari-50 border border-safari-100 rounded font-bold text-sm text-safari-900 outline-none" 
+                                    value={rate.rate}
+                                    onChange={(e) => {
+                                      const newList = [...(branding.transportRates || [])];
+                                      newList[idx] = { ...rate, rate: Number(e.target.value) };
+                                      setBranding({ ...branding, transportRates: newList });
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {(branding.transportRates || []).length === 0 && (
+                            <div className="p-8 border border-dashed border-safari-100 rounded-lg text-center">
+                              <p className="text-xs text-safari-400 font-medium">No custom transport rates defined.</p>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-safari-400 font-medium italic">Define your agency's standard daily rates for different vehicle types.</p>
                       </div>
                     </div>
                   </div>
@@ -1805,40 +2201,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               </div>
             )}
 
-            {activeSettingsTab === 'data' && (
+            {activeSettingsTab === 'data' && profile?.is_super_user && (
               <div className="space-y-6 animate-fadeIn">
-                <section className="bg-white rounded-2xl shadow-sm border border-safari-100 p-8">
+                <section className="bg-white rounded-xl shadow-sm border border-safari-100 p-8">
                   <h3 className="text-lg font-bold text-safari-900 mb-8 flex items-center gap-2 italic">
                     <Database className="text-safari-500" size={20} />
-                    Raw Data Management
+                    Global System Log
                   </h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                      <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Park Fees (JSON)</label>
-                      <textarea 
-                        className="w-full p-4 bg-safari-50 border border-safari-100 rounded-2xl font-mono text-xs h-[400px] outline-none focus:ring-2 focus:ring-safari-500/20 shadow-inner no-scrollbar"
-                        value={JSON.stringify(branding.parkFees || [], null, 2)}
-                        onChange={(e) => {
-                          try {
-                            const parsed = JSON.parse(e.target.value);
-                            setBranding({ ...branding, parkFees: parsed });
-                          } catch { /* invalid json */ }
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-4">
-                      <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Transport Rates (JSON)</label>
-                      <textarea 
-                        className="w-full p-4 bg-safari-50 border border-safari-100 rounded-2xl font-mono text-xs h-[400px] outline-none focus:ring-2 focus:ring-safari-500/20 shadow-inner no-scrollbar"
-                        value={JSON.stringify(branding.transportRates || [], null, 2)}
-                        onChange={(e) => {
-                          try {
-                            const parsed = JSON.parse(e.target.value);
-                            setBranding({ ...branding, transportRates: parsed });
-                          } catch { /* invalid json */ }
-                        }}
-                      />
-                    </div>
+                  <p className="text-sm text-safari-500 font-medium mb-8">Platform-wide diagnostics and activity monitoring for super users.</p>
+                  <div className="p-12 bg-safari-50 rounded-xl border border-dashed border-safari-200 flex flex-col items-center justify-center text-center">
+                    <Database className="text-safari-300 mb-4" size={48} />
+                    <h4 className="font-bold text-safari-900">Advanced Data Hub</h4>
+                    <p className="text-xs text-safari-500 max-w-xs mt-2">Global pricing controls have been moved to individual agency settings. This tab now serves as a system log entry point.</p>
                   </div>
                 </section>
               </div>
@@ -3076,7 +3450,7 @@ const InvoicesView = ({ invoices, isLoading, onInvoice, quotations, onToggleConf
 
       {isSelectQuoteModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-scaleIn">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-scaleIn">
             <div className="bg-safari-900 p-6 text-white flex justify-between items-center">
               <div>
                 <h2 className="text-xl font-bold">Select Quote to Invoice</h2>
