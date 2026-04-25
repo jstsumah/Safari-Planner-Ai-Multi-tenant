@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.next
+.svelte-kit
+.output
+.vercel
+build
+*.log
+.DS_Store
+package-lock.json

@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  --font-title: var(--title-font);
+  --font-body: var(--body-font);
+
+  --color-primary: var(--primary-color);
+  --color-secondary: var(--secondary-color);
+
+  --color-safari-50: color-mix(in srgb, var(--primary-color), white 95%);
+  --color-safari-100: color-mix(in srgb, var(--primary-color), white 90%);
+  --color-safari-200: color-mix(in srgb, var(--primary-color), white 80%);
+  --color-safari-300: color-mix(in srgb, var(--primary-color), white 60%);
+  --color-safari-400: color-mix(in srgb, var(--primary-color), white 40%);
+  --color-safari-500: var(--primary-color);
+  --color-safari-600: color-mix(in srgb, var(--primary-color), black 20%);
+  --color-safari-700: color-mix(in srgb, var(--primary-color), black 40%);
+  --color-safari-800: color-mix(in srgb, var(--primary-color), black 60%);
+  --color-safari-900: var(--secondary-color);
+  --color-safari-950: color-mix(in srgb, var(--secondary-color), black 30%);
+
+  --animate-fadeIn: fadeIn 0.5s ease-out forwards;
+  --animate-bounce-slow: bounce-slow 3s infinite;
+  --animate-slow-zoom: slow-zoom 20s ease-in-out infinite alternate;
+  --animate-spin-slow: spin 3s linear infinite;
+
+  @keyframes fadeIn {
+    0% { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes bounce-slow {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  @keyframes slow-zoom {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.1); }
+  }
+}
+
+@layer base {
+  :root {
+    --primary-color: #8f8664;
+    --secondary-color: #413c31;
+    --title-font: "Playfair Display", serif;
+    --body-font: "Inter", sans-serif;
+    --title-size: 32px;
+    --body-size: 16px;
+    --title-weight: 800;
+    --body-weight: 400;
+    --title-spacing: -0.02em;
+    --body-line-height: 1.6;
+  }
+
+  body {
+    @apply bg-safari-50 text-safari-900 antialiased;
+    font-family: var(--body-font);
+    font-size: var(--body-size);
+    font-weight: var(--body-weight);
+    line-height: var(--body-line-height);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--title-font);
+    letter-spacing: var(--title-spacing);
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "SafariPlanner.ai",
+  "description": "A multi-step AI-powered safari itinerary builder that generates detailed travel plans and PDF exports using Google Gemini models.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
