@@ -566,12 +566,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         toast.success("Global landing page configuration updated.");
       } else {
         if (!company) return;
+        const updatePayload: any = {
+           branding: targetBranding,
+           updated_at: new Date().toISOString()
+        };
+        if (targetBranding.agencyName) {
+           updatePayload.name = targetBranding.agencyName;
+        }
         const { error } = await supabase
           .from('companies')
-          .update({ 
-            branding: targetBranding,
-            updated_at: new Date().toISOString()
-          })
+          .update(updatePayload)
           .eq('id', company.id);
         
         if (error) throw error;
@@ -579,7 +583,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       }
 
       await refreshProfile();
-      fetchConfig(); // Refresh both states
+      // No need to call fetchConfig() here because the local state is already up to date, 
+      // and calling it now would temporarily revert the UI to the old company.branding 
+      // before refreshProfile's state update is flushed.
     } catch (err: any) {
       toast.error("Failed to save: " + err.message);
     } finally {

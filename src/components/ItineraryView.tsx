@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { GeneratedItinerary, SafariFormData, Lodge, BrandingConfig, TeamMember } from '../types';
-import { Download, Mail, Check, RefreshCw, MapPin, Home, ChevronRight, Maximize2, Edit3, Loader2, ArrowLeft, Share2, Image as ImageIcon, Calculator, Phone, MessageSquare, Send, ExternalLink, X, User } from 'lucide-react';
+import { Download, Mail, Check, RefreshCw, MapPin, Home, ChevronRight, ChevronLeft, Maximize2, Edit3, Loader2, ArrowLeft, Share2, Image as ImageIcon, Calculator, Phone, MessageSquare, Send, ExternalLink, X, User } from 'lucide-react';
 import { generateItineraryPDF } from '../services/pdfService';
 import { saveItineraryToDatabase } from '../services/aiService';
 import EmailModal from './EmailModal';
@@ -44,6 +45,45 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({
   const { user } = useAuth();
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [specialist, setSpecialist] = useState<TeamMember | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const handlePrevImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (lightboxIndex !== null && itinerary.gallery) {
+      setLightboxIndex(lightboxIndex === 0 ? itinerary.gallery.length - 1 : lightboxIndex - 1);
+    }
+  };
+
+  const handleNextImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (lightboxIndex !== null && itinerary.gallery) {
+      setLightboxIndex(lightboxIndex === itinerary.gallery.length - 1 ? 0 : lightboxIndex + 1);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (lightboxIndex === null) return;
+      if (e.key === 'ArrowRight') handleNextImage();
+      if (e.key === 'ArrowLeft') handlePrevImage();
+      if (e.key === 'Escape') setLightboxIndex(null);
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxIndex, itinerary.gallery]);
+
+  useEffect(() => {
+    if (lightboxIndex !== null) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [lightboxIndex]);
 
   useEffect(() => {
     const fetchSpecialist = async () => {
@@ -379,7 +419,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({
                     alt={`Gallery ${i}`} 
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
                     referrerPolicy="no-referrer"
-                    onClick={() => window.open(url, '_blank')}
+                    onClick={() => setLightboxIndex(i)}
                   />
                 </div>
               ))}
@@ -571,6 +611,52 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({
           </div>
         </div>
       </div>
+      
+      {/* Lightbox for Gallery */}
+      {lightboxIndex !== null && itinerary.gallery && createPortal(
+        <div 
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center backdrop-blur-sm"
+          onClick={() => setLightboxIndex(null)}
+        >
+          <div className="absolute top-4 right-4">
+            <button 
+              onClick={() => setLightboxIndex(null)}
+              className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors backdrop-blur-md"
+            >
+              <X size={24} />
+            </button>
+          </div>
+          
+          <button 
+            onClick={handlePrevImage}
+            className="absolute left-4 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors backdrop-blur-md hidden md:block"
+          >
+            <ChevronLeft size={32} />
+          </button>
+
+          <div className="relative w-full h-full max-w-7xl max-h-[90vh] flex items-center justify-center p-4">
+            <img 
+              src={itinerary.gallery[lightboxIndex]} 
+              alt={`Gallery Image ${lightboxIndex + 1}`} 
+              className="max-w-full max-h-full object-contain shadow-2xl rounded-lg"
+              referrerPolicy="no-referrer"
+              onClick={(e) => e.stopPropagation()} // Prevent closing when clicking the image itself
+            />
+            
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/50 backdrop-blur-md rounded-full text-white text-sm">
+              {lightboxIndex + 1} / {itinerary.gallery.length}
+            </div>
+          </div>
+          
+          <button 
+            onClick={handleNextImage}
+            className="absolute right-4 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors backdrop-blur-md hidden md:block"
+          >
+            <ChevronRight size={32} />
+          </button>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
