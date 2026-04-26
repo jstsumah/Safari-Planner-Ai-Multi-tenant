@@ -722,24 +722,24 @@ const LandingPage: React.FC<LandingPageProps> = ({
               </div>
               <div className="space-y-6">
                 <div className="flex items-center gap-4 group cursor-pointer">
-                  <div className="w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-md flex items-center justify-center group-hover:bg-safari-500 transition-colors shadow-lg"><Mail size={24} /></div>
-                  <div>
+                  <div className="w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-md flex items-center justify-center shrink-0 group-hover:bg-safari-500 transition-colors shadow-lg"><Mail size={24} /></div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-black uppercase tracking-widest text-safari-400 drop-shadow-md">Email Us</p>
-                    <p className="font-bold text-lg drop-shadow-md">{branding.contactEmail || "hello@safariplanner.ai"}</p>
+                    <p className="font-bold text-lg drop-shadow-md truncate" title={branding.contactEmail || "hello@safariplanner.ai"}>{branding.contactEmail || "hello@safariplanner.ai"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 group cursor-pointer">
-                  <div className="w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-md flex items-center justify-center group-hover:bg-safari-500 transition-colors shadow-lg"><Phone size={24} /></div>
-                  <div>
+                  <div className="w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-md flex items-center justify-center shrink-0 group-hover:bg-safari-500 transition-colors shadow-lg"><Phone size={24} /></div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs font-black uppercase tracking-widest text-safari-400 drop-shadow-md">Direct Line</p>
-                    <p className="font-bold text-lg drop-shadow-md">{branding.contactPhone || "+254 700 000 000"}</p>
+                    <p className="font-bold text-lg drop-shadow-md truncate" title={branding.contactPhone || "+254 700 000 000"}>{branding.contactPhone || "+254 700 000 000"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 group cursor-pointer">
-                  <div className="w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-md flex items-center justify-center group-hover:bg-safari-500 transition-colors shadow-lg"><MapPin size={24} /></div>
-                  <div>
+                  <div className="w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-md flex items-center justify-center shrink-0 group-hover:bg-safari-500 transition-colors shadow-lg"><MapPin size={24} /></div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-xs font-black uppercase tracking-widest text-safari-400 drop-shadow-md">HQ</p>
-                    <p className="font-bold text-lg drop-shadow-md">{branding.contactAddress || "Nairobi, Kenya"}</p>
+                    <p className="font-bold text-lg drop-shadow-md truncate" title={branding.contactAddress || "Nairobi, Kenya"}>{branding.contactAddress || "Nairobi, Kenya"}</p>
                   </div>
                 </div>
               </div>

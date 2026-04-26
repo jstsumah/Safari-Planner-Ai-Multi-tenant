@@ -1,6 +1,7 @@
-import { SafariFormData, GeneratedItinerary } from "../types";
+import { SafariFormData, GeneratedItinerary, BrandingConfig } from "../types";
 
-export const generateEmailHtml = (formData: SafariFormData, itinerary: GeneratedItinerary): string => {
+export const generateEmailHtml = (formData: SafariFormData, itinerary: GeneratedItinerary, branding?: BrandingConfig): string => {
+  const appName = branding?.appName || "SafariPlanner.ai";
   return `
     <div style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px;">
       <h1 style="color: #8f8664;">Safari Booking Request</h1>
@@ -25,7 +26,7 @@ export const generateEmailHtml = (formData: SafariFormData, itinerary: Generated
       <p>Please find the detailed PDF itinerary attached to this email.</p>
       
       <footer style="margin-top: 40px; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
-        Sent via SafariPlanner.ai
+        Sent via ${appName}
       </footer>
     </div>
   `;

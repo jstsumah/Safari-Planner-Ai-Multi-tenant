@@ -229,7 +229,7 @@ const App: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('master_itineraries')
-        .select('*')
+        .select('*, company:companies(branding, name)')
         .eq('id', id)
         .single();
       
@@ -242,6 +242,14 @@ const App: React.FC = () => {
           name: 'Guest',
           startDate: new Date().toISOString().split('T')[0]
         });
+        
+        // Use company branding if available
+        if (data.company) {
+          const compBranding = typeof data.company.branding === 'string' ? JSON.parse(data.company.branding) : (data.company.branding || {});
+          // Set company name to override appName in branding
+          setBranding({ ...DEFAULT_BRANDING, ...compBranding, appName: data.company.name || compBranding.appName || DEFAULT_BRANDING.appName });
+        }
+        
         setIsSharedView(true);
         setViewMode('itinerary');
       } else {
@@ -262,7 +270,7 @@ const App: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('itineraries')
-        .select('*')
+        .select('*, company:companies(branding, name)')
         .eq('id', id)
         .single();
       
@@ -270,6 +278,13 @@ const App: React.FC = () => {
       if (data) {
         setItinerary(data.itinerary_data);
         setFormData(data.form_data);
+        
+        // Use company branding if available
+        if (data.company) {
+          const compBranding = typeof data.company.branding === 'string' ? JSON.parse(data.company.branding) : (data.company.branding || {});
+          setBranding({ ...DEFAULT_BRANDING, ...compBranding, appName: data.company.name || compBranding.appName || DEFAULT_BRANDING.appName });
+        }
+        
         setIsSharedView(true);
         setViewMode('itinerary');
       }
@@ -669,12 +684,16 @@ const App: React.FC = () => {
         <header className="bg-white shadow-sm sticky top-0 z-50 border-b border-safari-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div className="flex items-center space-x-2 cursor-pointer" onClick={navigateHome}>
-              <Compass className="text-safari-600" size={32} />
-              <h1 className="text-xl md:text-2xl font-bold text-safari-900 tracking-tight">
-                Safari<span className="text-safari-600">Planner</span>.ai
+              <Compass className="text-safari-600 shrink-0" size={32} />
+              <h1 className="text-xl md:text-2xl font-bold text-safari-900 tracking-tight truncate max-w-[200px] md:max-w-sm">
+                {branding.appName && branding.appName !== DEFAULT_BRANDING.appName ? (
+                  branding.appName
+                ) : (
+                  <>Safari<span className="text-safari-600">Planner</span>.ai</>
+                )}
               </h1>
             </div>
-                  <div className="flex items-center gap-2 md:gap-4">
+                  <div className="flex items-center gap-2 md:gap-4 shrink-0">
                     <button 
                       onClick={navigateHome}
                       className="text-sm font-bold text-safari-600 hover:text-safari-900 px-4 py-2 hover:bg-safari-50 rounded-lg transition-all"

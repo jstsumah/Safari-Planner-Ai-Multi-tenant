@@ -525,39 +525,39 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({
               <h3 className="text-xs font-black uppercase tracking-widest text-safari-400 mb-6">Contact Information</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="flex items-start gap-4 p-4 rounded-lg bg-white border border-safari-100 shadow-sm hover:border-safari-300 transition-all">
-                  <div className="p-3 bg-safari-50 text-safari-600 rounded-md">
+                  <div className="p-3 bg-safari-50 text-safari-600 rounded-md shrink-0">
                     <Phone size={20} />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-black uppercase text-safari-400 mb-1">Call Us</p>
-                    <p className="text-sm font-bold text-safari-900">{branding.contactPhone}</p>
+                    <p className="text-sm font-bold text-safari-900 truncate" title={branding.contactPhone}>{branding.contactPhone}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4 p-4 rounded-lg bg-white border border-safari-100 shadow-sm hover:border-safari-300 transition-all">
-                  <div className="p-3 bg-safari-50 text-safari-600 rounded-md">
+                  <div className="p-3 bg-safari-50 text-safari-600 rounded-md shrink-0">
                     <Mail size={20} />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-black uppercase text-safari-400 mb-1">Email Us</p>
-                    <p className="text-sm font-bold text-safari-900">{branding.contactEmail}</p>
+                    <p className="text-sm font-bold text-safari-900 truncate" title={branding.contactEmail}>{branding.contactEmail}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4 p-4 rounded-lg bg-white border border-safari-100 shadow-sm hover:border-safari-300 transition-all">
-                  <div className="p-3 bg-safari-50 text-safari-600 rounded-md">
+                  <div className="p-3 bg-safari-50 text-safari-600 rounded-md shrink-0">
                     <MessageSquare size={20} />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-black uppercase text-safari-400 mb-1">WhatsApp</p>
-                    <p className="text-sm font-bold text-safari-900">{branding.whatsappNumber}</p>
+                    <p className="text-sm font-bold text-safari-900 truncate" title={branding.whatsappNumber}>{branding.whatsappNumber}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-4 p-4 rounded-lg bg-white border border-safari-100 shadow-sm hover:border-safari-300 transition-all">
-                  <div className="p-3 bg-safari-50 text-safari-600 rounded-md">
+                  <div className="p-3 bg-safari-50 text-safari-600 rounded-md shrink-0">
                     <ExternalLink size={20} />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-black uppercase text-safari-400 mb-1">Visit Us</p>
-                    <p className="text-sm font-bold text-safari-900 truncate max-w-[150px]">{branding.contactAddress}</p>
+                    <p className="text-sm font-bold text-safari-900 truncate" title={branding.contactAddress}>{branding.contactAddress}</p>
                   </div>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Send, Paperclip, Loader2, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { SafariFormData, GeneratedItinerary } from '../types';
+import { SafariFormData, GeneratedItinerary, BrandingConfig } from '../types';
 import { generateEmailHtml, sendSafariEmail } from '../services/emailService';
 
 interface EmailModalProps {
@@ -39,7 +39,7 @@ const EmailModal: React.FC<EmailModalProps> = ({ isOpen, onClose, formData, itin
     if (!pdfBlob) return;
 
     setIsSending(true);
-    const htmlBody = generateEmailHtml(formData, itinerary);
+    const htmlBody = generateEmailHtml(formData, itinerary, branding);
 
     try {
       await sendSafariEmail({
