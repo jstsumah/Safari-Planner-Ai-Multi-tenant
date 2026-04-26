@@ -8,7 +8,9 @@ export enum BudgetTier {
 export enum TransportType {
   LandCruiser = '4x4 Land Cruiser',
   FlightRoad = 'Flight + Road Transfers',
-  OverlandTruck = 'Overland Truck'
+  OverlandTruck = 'Overland Truck',
+  Train = 'Train (e.g., SGR)',
+  FlyIn = 'Fly-in Safari Only'
 }
 
 export enum PropertyType {

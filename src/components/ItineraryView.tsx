@@ -428,6 +428,86 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({
         )}
       </div>
 
+      {/* Dynamic Route Map */}
+      {(() => {
+        if (!itinerary.schedule || itinerary.schedule.length === 0) return null;
+        
+        const locations = itinerary.schedule
+          .filter(day => !day.isSectionBreak)
+          .map(day => {
+            let loc = day.accommodation;
+            if (!loc || loc.toLowerCase() === 'none' || loc.toLowerCase().includes('flight')) {
+               if (day.title) {
+                 const match = day.title.match(/in (.+?)$/i) || day.title.match(/to (.+?)$/i);
+                 if (match && match[1]) {
+                   loc = match[1].trim();
+                 } else {
+                   const parts = day.title.split(':');
+                   if (parts.length > 1) {
+                     loc = parts[1].trim();
+                   }
+                 }
+               }
+            }
+            if (loc) {
+               return loc.replace(/\(.*?\)/g, '').trim();
+            }
+            return null;
+          })
+          .filter(Boolean) as string[];
+
+        const uniqueLocations: string[] = [];
+        locations.forEach(loc => {
+          if (uniqueLocations.length === 0 || uniqueLocations[uniqueLocations.length - 1] !== loc) {
+            uniqueLocations.push(loc);
+          }
+        });
+
+        if (uniqueLocations.length < 2) return null;
+
+        const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+        let mapUrl = '';
+
+        if (apiKey) {
+          const origin = encodeURIComponent(uniqueLocations[0]);
+          const destination = encodeURIComponent(uniqueLocations[uniqueLocations.length - 1]);
+          const waypoints = uniqueLocations.slice(1, -1).map(loc => encodeURIComponent(loc)).join('|');
+          
+          mapUrl = `https://www.google.com/maps/embed/v1/directions?key=${apiKey}&origin=${origin}&destination=${destination}`;
+          if (waypoints) {
+            mapUrl += `&waypoints=${waypoints}`;
+          }
+        } else {
+          const origin = encodeURIComponent(uniqueLocations[0]);
+          const daddr = uniqueLocations.slice(1).map(loc => encodeURIComponent(loc)).join('+to:');
+          mapUrl = `https://maps.google.com/maps?saddr=${origin}&daddr=${daddr}&output=embed`;
+        }
+
+        return (
+          <div className="bg-white p-8 rounded-md shadow-xl border-t-8 border-safari-300 mb-8">
+            <h2 className="text-xl font-bold text-safari-800 mb-6 flex items-center gap-2">
+              <MapPin className="text-safari-500" /> Route Map
+            </h2>
+            <div className="w-full aspect-[4/3] md:aspect-[21/9] rounded-lg overflow-hidden border border-safari-100 bg-safari-50 relative">
+              <iframe
+                width="100%"
+                height="100%"
+                frameBorder="0"
+                style={{ border: 0 }}
+                src={mapUrl}
+                allowFullScreen
+                title="Itinerary Route Map"
+              ></iframe>
+              {!apiKey && (
+                 <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm px-3 py-1 text-[10px] uppercase tracking-widest font-bold text-safari-500 rounded shadow-sm">
+                   Basic Map View
+                 </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="space-y-10 relative before:absolute before:left-6 md:before:left-16 before:top-4 before:bottom-4 before:w-0.5 before:bg-safari-200">
         {(itinerary.schedule || []).map((day, idx) => {
           if (day.isSectionBreak) {
@@ -482,7 +562,7 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({
                   <div className="p-6 md:p-8">
                     <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                       <div>
-                        <div className="hidden md:block text-xs font-bold text-safari-500 uppercase tracking-widest mb-1">{dayDisplay} • {day.driveTime} Drive</div>
+                        <div className="hidden md:block text-xs font-bold text-safari-500 uppercase tracking-widest mb-1">{dayDisplay} • Travel: {day.driveTime}</div>
                         <h3 className="text-2xl font-bold text-safari-900">{day.title}</h3>
                       </div>
                       

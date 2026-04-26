@@ -33,7 +33,7 @@ export async function generateSafariItinerary(data: SafariFormData): Promise<Gen
           "morningActivity": "What they do in the morning",
           "afternoonActivity": "What they do in the afternoon",
           "accommodation": "Suggested lodge name matching budget tier",
-          "driveTime": "Estimated travel time, e.g. 2-3 hours",
+          "driveTime": "Estimated travel time & mode, e.g. 2 hr drive, 45 min flight, 3 hr scenic train",
           "meals": "Breakfast, Lunch, Dinner"
         }
       ],

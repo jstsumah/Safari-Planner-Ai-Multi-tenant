@@ -131,7 +131,7 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
         {/* Header Navigation */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white rounded-2xl shadow-xl flex items-center justify-center border border-safari-100">
+            <div className="w-12 h-12 bg-white rounded-xl shadow-xl flex items-center justify-center border border-safari-100">
               <Building2 style={{ color: primaryColor }} size={24} />
             </div>
             <div>
@@ -143,14 +143,14 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
           </div>
           <button 
             onClick={onClose}
-            className="px-6 py-2.5 bg-white border border-safari-200 text-safari-600 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-safari-50 transition-all shadow-sm"
+            className="px-6 py-2.5 bg-white border border-safari-200 text-safari-600 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-safari-50 transition-all shadow-sm"
           >
             Close Profile
           </button>
         </div>
 
         {/* Hero Section */}
-        <section className="relative h-96 rounded-[3rem] overflow-hidden shadow-2xl group">
+        <section className="relative h-96 rounded-2xl overflow-hidden shadow-2xl group">
           <img 
             src={branding?.heroImage || "https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&q=80&w=2000"} 
             className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-[2s]"
@@ -181,8 +181,8 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {(branding?.statistics && branding.statistics.length > 0) ? (
             branding.statistics.map((stat: any, idx: number) => (
-              <div key={idx} className="bg-white p-8 rounded-[2rem] shadow-sm border border-safari-50 flex flex-col items-center text-center space-y-3 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                <div className="p-4 bg-safari-50 rounded-2xl">
+              <div key={idx} className="bg-white p-8 rounded-xl shadow-sm border border-safari-50 flex flex-col items-center text-center space-y-3 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                <div className="p-4 bg-safari-50 rounded-xl">
                   {React.cloneElement(getIcon(stat.iconType) as React.ReactElement, { size: 24 })}
                 </div>
                 <div>
@@ -198,8 +198,8 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
               { label: 'Wildlife Guides', value: '45+', icon: <Shield className="text-green-500" /> },
               { label: 'Awards Won', value: '12', icon: <Award className="text-amber-500" /> },
             ].map((stat, idx) => (
-              <div key={idx} className="bg-white p-8 rounded-[2rem] shadow-sm border border-safari-50 flex flex-col items-center text-center space-y-3 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                <div className="p-4 bg-safari-50 rounded-2xl">
+              <div key={idx} className="bg-white p-8 rounded-xl shadow-sm border border-safari-50 flex flex-col items-center text-center space-y-3 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                <div className="p-4 bg-safari-50 rounded-xl">
                   {React.cloneElement(stat.icon as React.ReactElement, { size: 24 })}
                 </div>
                 <div>
@@ -240,7 +240,7 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
                 {team.length > 0 ? team.map((member) => (
                   <div key={member.id} className="group text-center space-y-3">
-                    <div className="relative aspect-square rounded-[2rem] overflow-hidden shadow-lg border-4 border-white">
+                    <div className="relative aspect-square rounded-xl overflow-hidden shadow-lg border-4 border-white">
                       <img 
                         src={member.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${member.full_name}`} 
                         className="w-full h-full object-cover"
@@ -256,7 +256,7 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
                     </div>
                   </div>
                 )) : (
-                  <div className="col-span-full py-12 text-center border-2 border-dashed border-safari-100 rounded-[2rem]">
+                  <div className="col-span-full py-12 text-center border-2 border-dashed border-safari-100 rounded-xl">
                     <p className="text-safari-300 text-sm italic">Our team list is arriving soon from across the savannah...</p>
                   </div>
                 )}
@@ -265,7 +265,7 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
           </div>
 
           {/* Contact Sidebar */}
-          <div className="bg-safari-900 rounded-[3rem] p-10 text-white space-y-10 shadow-2xl relative overflow-hidden">
+          <div className="bg-safari-900 rounded-2xl p-10 text-white space-y-10 shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-safari-800 rounded-bl-full -mr-10 -mt-10 opacity-50" />
             
             <div className="space-y-2">
@@ -280,8 +280,8 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
                 { icon: <Phone size={20} />, label: 'Phone', value: branding?.contactPhone || '+254 700 000000' },
                 { icon: <Globe size={20} />, label: 'WhatsApp', value: branding?.whatsappNumber || 'Available' }
               ].map((item, idx) => (
-                <div key={idx} className="flex items-start gap-4 p-4 rounded-2xl hover:bg-white/5 transition-all cursor-default">
-                  <div className="p-3 bg-white/10 rounded-xl text-safari-300">
+                <div key={idx} className="flex items-start gap-4 p-4 rounded-xl hover:bg-white/5 transition-all cursor-default">
+                  <div className="p-3 bg-white/10 rounded-lg text-safari-300">
                     {item.icon}
                   </div>
                   <div>
@@ -293,7 +293,7 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
             </div>
 
             <div className="pt-4">
-              <button className="w-full py-4 bg-white text-safari-900 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-safari-100 transition-all shadow-xl shadow-black/20">
+              <button className="w-full py-4 bg-white text-safari-900 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-safari-100 transition-all shadow-xl shadow-black/20">
                 Book a Consultation
               </button>
             </div>
@@ -318,7 +318,7 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Review Form */}
-            <div className="bg-white p-8 rounded-[2rem] border-2 border-dashed border-safari-200 flex flex-col justify-center items-center text-center space-y-6">
+            <div className="bg-white p-8 rounded-xl border-2 border-dashed border-safari-200 flex flex-col justify-center items-center text-center space-y-6">
               <div className="p-4 bg-safari-50 rounded-full text-safari-500">
                 <MessageSquare size={32} />
               </div>
@@ -331,12 +331,12 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
                 <input 
                   type="text"
                   placeholder="Your Name"
-                  className="w-full px-4 py-3 bg-safari-50 border border-safari-100 rounded-xl text-sm focus:ring-2 focus:ring-safari-500 outline-none transition-all"
+                  className="w-full px-4 py-3 bg-safari-50 border border-safari-100 rounded-md text-sm focus:ring-2 focus:ring-safari-500 outline-none transition-all"
                   value={newReview.author_name}
                   onChange={e => setNewReview({...newReview, author_name: e.target.value})}
                 />
                 <select 
-                  className="w-full px-4 py-3 bg-safari-50 border border-safari-100 rounded-xl text-sm focus:ring-2 focus:ring-safari-500 outline-none transition-all"
+                  className="w-full px-4 py-3 bg-safari-50 border border-safari-100 rounded-md text-sm focus:ring-2 focus:ring-safari-500 outline-none transition-all"
                   value={newReview.rating}
                   onChange={e => setNewReview({...newReview, rating: Number(e.target.value)})}
                 >
@@ -347,14 +347,14 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
                 <textarea 
                   placeholder="Tell us about the wildlife..."
                   rows={3}
-                  className="w-full px-4 py-3 bg-safari-50 border border-safari-100 rounded-xl text-sm focus:ring-2 focus:ring-safari-500 outline-none transition-all resize-none"
+                  className="w-full px-4 py-3 bg-safari-50 border border-safari-100 rounded-md text-sm focus:ring-2 focus:ring-safari-500 outline-none transition-all resize-none"
                   value={newReview.comment}
                   onChange={e => setNewReview({...newReview, comment: e.target.value})}
                 />
                 <button 
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-3 bg-safari-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-safari-800 transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-safari-900 text-white rounded-md font-black text-[10px] uppercase tracking-widest hover:bg-safari-800 transition-all flex items-center justify-center gap-2"
                 >
                   {isSubmitting ? 'Posting...' : <><Plus size={14} /> Post Review</>}
                 </button>
@@ -363,8 +363,8 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
 
             {/* Review Cards */}
             {reviews.map((review) => (
-              <div key={review.id} className="bg-white p-8 rounded-[2rem] shadow-sm border border-safari-50 space-y-4 relative group hover:shadow-xl transition-all">
-                <div className="absolute -top-4 -right-4 w-12 h-12 bg-safari-50 rounded-2xl flex items-center justify-center text-safari-200 group-hover:text-safari-400 group-hover:rotate-12 transition-all">
+              <div key={review.id} className="bg-white p-8 rounded-xl shadow-sm border border-safari-50 space-y-4 relative group hover:shadow-xl transition-all">
+                <div className="absolute -top-4 -right-4 w-12 h-12 bg-safari-50 rounded-xl flex items-center justify-center text-safari-200 group-hover:text-safari-400 group-hover:rotate-12 transition-all">
                   <MessageSquare size={20} />
                 </div>
                 <div className="flex text-amber-500 gap-1">

@@ -780,8 +780,8 @@ const MasterItineraryEditor: React.FC<MasterItineraryEditorProps> = ({ safari, l
                        </div>
                        <div className="grid grid-cols-2 gap-4">
                           <div>
-                             <label className="block text-[10px] font-black uppercase text-safari-400 mb-2">Drive Time</label>
-                             <input className="w-full p-3 bg-white border border-safari-100 rounded-lg text-xs font-bold shadow-sm focus:ring-2 focus:ring-safari-400 outline-none" value={day.driveTime} onChange={(e) => updateDay(dIdx, 'driveTime', e.target.value)} />
+                             <label className="block text-[10px] font-black uppercase text-safari-400 mb-2">Travel Info</label>
+                             <input placeholder="e.g. 2hr flight, etc" className="w-full p-3 bg-white border border-safari-100 rounded-lg text-xs font-bold shadow-sm focus:ring-2 focus:ring-safari-400 outline-none" value={day.driveTime} onChange={(e) => updateDay(dIdx, 'driveTime', e.target.value)} />
                           </div>
                           <div>
                              <label className="block text-[10px] font-black uppercase text-safari-400 mb-2">Meals</label>
