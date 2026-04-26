@@ -164,12 +164,21 @@ const DEFAULT_BRANDING: BrandingConfig = {
 
 const App: React.FC = () => {
   const { user, profile, company, loading: authLoading, signOut } = useAuth();
-  const [formData, setFormData] = useState<SafariFormData | null>(null);
-  const [itinerary, setItinerary] = useState<GeneratedItinerary | null>(null);
+  const [formData, setFormData] = useState<SafariFormData | null>(() => {
+    const saved = sessionStorage.getItem('safari_formData');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [itinerary, setItinerary] = useState<GeneratedItinerary | null>(() => {
+    const saved = sessionStorage.getItem('safari_itinerary');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [lodges, setLodges] = useState<Lodge[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeLodge, setActiveLodge] = useState<Lodge | null>(null);
+  const [activeLodge, setActiveLodge] = useState<Lodge | null>(() => {
+    const saved = sessionStorage.getItem('safari_activeLodge');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [isLandingEnabled, setIsLandingEnabled] = useState(true);
   const [branding, setBranding] = useState<BrandingConfig>(DEFAULT_BRANDING);
   const [systemBranding, setSystemBranding] = useState<BrandingConfig>(DEFAULT_BRANDING);
@@ -181,6 +190,12 @@ const App: React.FC = () => {
     if (params.get('master') || params.get('itin')) return 'itinerary';
     if (params.get('tool') === 'calculator') return 'calculator';
     if (params.get('tool') === 'planner') return 'form';
+
+    // Priority: Saved viewMode if we were already in an active session
+    const savedView = sessionStorage.getItem('safari_viewMode');
+    if (savedView && ['form', 'itinerary', 'history', 'admin', 'calculator', 'partners'].includes(savedView)) {
+      return savedView as any;
+    }
 
     // Force landing as the first page
     return 'landing';
@@ -303,6 +318,26 @@ const App: React.FC = () => {
     };
     fetchSystemBranding();
   }, []);
+
+  // 0.5. Persist critical state to sessionStorage
+  useEffect(() => {
+    if (viewMode) sessionStorage.setItem('safari_viewMode', viewMode);
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (formData) sessionStorage.setItem('safari_formData', JSON.stringify(formData));
+    else sessionStorage.removeItem('safari_formData');
+  }, [formData]);
+
+  useEffect(() => {
+    if (itinerary) sessionStorage.setItem('safari_itinerary', JSON.stringify(itinerary));
+    else sessionStorage.removeItem('safari_itinerary');
+  }, [itinerary]);
+
+  useEffect(() => {
+    if (activeLodge) sessionStorage.setItem('safari_activeLodge', JSON.stringify(activeLodge));
+    else sessionStorage.removeItem('safari_activeLodge');
+  }, [activeLodge]);
 
   // 1. Initialize branding and settings on mount or company change
   useEffect(() => {
@@ -443,6 +478,8 @@ const App: React.FC = () => {
     setIsFromHistory(false);
     setIsFromAdmin(false);
     setIsSharedView(false);
+    // Clear persisted form step
+    sessionStorage.removeItem('safari_form_step');
     // Clear URL params if exiting standalone tool or shared view
     if (viewMode === 'calculator' || isSharedView) {
       window.history.pushState({}, '', window.location.pathname);
@@ -480,7 +517,13 @@ const App: React.FC = () => {
     else setViewMode('form');
   };
 
-  if (authLoading) {
+  // Allow shared views, the planner form and results to be public
+  const isPublicView = isSharedView || viewMode === 'calculator' || viewMode === 'landing' || viewMode === 'auth' || viewMode === 'form' || viewMode === 'itinerary';
+
+  // Improved loading logic to prevent data loss on tab switch/refresh
+  const showFullLoader = authLoading && !isPublicView && !user && !profile;
+
+  if (showFullLoader) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-safari-50 text-safari-600">
         <div className="flex flex-col items-center gap-4">
@@ -490,9 +533,6 @@ const App: React.FC = () => {
       </div>
     );
   }
-
-  // Allow shared views, the planner form and results to be public
-  const isPublicView = isSharedView || viewMode === 'calculator' || viewMode === 'landing' || viewMode === 'auth' || viewMode === 'form' || viewMode === 'itinerary';
 
   if (!user && !isPublicView) {
     return <Onboarding onComplete={(type) => setViewMode(type === 'user' ? 'history' : 'admin')} />;

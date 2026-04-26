@@ -48,9 +48,17 @@ const DEFAULT_DATA: SafariFormData = {
 };
 
 const SafariForm: React.FC<SafariFormProps> = ({ onSubmit, isLoading, initialData, branding }) => {
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(() => {
+    const savedStep = sessionStorage.getItem('safari_form_step');
+    return savedStep ? parseInt(savedStep) : 1;
+  });
   const [formData, setFormData] = useState<SafariFormData>(initialData || DEFAULT_DATA);
   const [errors, setErrors] = useState<{ name?: string; email?: string }>({});
+
+  // Persist step changes
+  React.useEffect(() => {
+    sessionStorage.setItem('safari_form_step', step.toString());
+  }, [step]);
 
   // Dynamic Options from Branding
   const countries = branding.formOptions?.countries || [
@@ -77,7 +85,11 @@ const SafariForm: React.FC<SafariFormProps> = ({ onSubmit, isLoading, initialDat
   const accommodationTypes = branding.formOptions?.accommodationTypes || ["Lodge", "Tented Camp", "Boutique Hotel", "Private Villa", "Mobile Camp"];
 
   const updateField = (field: keyof SafariFormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value };
+      sessionStorage.setItem('safari_formData', JSON.stringify(newData));
+      return newData;
+    });
     if (errors[field as keyof typeof errors]) {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
@@ -86,11 +98,15 @@ const SafariForm: React.FC<SafariFormProps> = ({ onSubmit, isLoading, initialDat
   const toggleSelection = (field: 'destinations' | 'activities' | 'preferredAccommodations', item: string) => {
     setFormData(prev => {
       const list = prev[field] as string[];
+      let newList;
       if (list.includes(item)) {
-        return { ...prev, [field]: list.filter(i => i !== item) };
+        newList = list.filter(i => i !== item);
       } else {
-        return { ...prev, [field]: [...list, item] };
+        newList = [...list, item];
       }
+      const newData = { ...prev, [field]: newList };
+      sessionStorage.setItem('safari_formData', JSON.stringify(newData));
+      return newData;
     });
   };
 

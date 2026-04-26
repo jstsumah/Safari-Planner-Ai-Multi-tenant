@@ -1,5 +1,6 @@
 
 import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Lodge, PropertyType, BudgetTier, Season, UnitCategory, SeasonalRate } from '../types';
 import { 
   X, Save, Plus, Trash2, Building, Info, 
@@ -624,36 +625,43 @@ const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies 
     </div>
 
     {/* Storage Browser Modal */}
-      {isStorageBrowserOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8 bg-safari-900/95 backdrop-blur-md animate-fadeIn">
-          <div className="bg-white w-full max-w-6xl h-full max-h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col border border-white/10">
-            <div className="p-8 border-b border-safari-100 flex justify-between items-center bg-safari-50/50">
-              <div>
-                <h3 className="text-2xl font-black text-safari-900 flex items-center gap-3">
-                  <div className="p-2 bg-safari-100 rounded-lg text-safari-600">
-                    <ImageIcon size={24} />
-                  </div>
-                  Property Asset Manager
-                </h3>
-                <p className="text-[10px] text-safari-500 font-black uppercase tracking-[0.2em] mt-1 ml-12">
-                  Select visual assets for this property profile
-                </p>
-              </div>
+      {isStorageBrowserOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-safari-950/90 backdrop-blur-xl animate-fadeIn p-4 md:p-8">
+          <div className="bg-white w-full max-w-6xl h-full max-h-[95vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-white/20 relative">
+            {/* Header */}
+            <div className="p-6 md:p-8 border-b border-safari-100 flex justify-between items-center bg-safari-50/80 sticky top-0 z-20 backdrop-blur-md">
               <div className="flex items-center gap-4">
+                <div className="p-3 bg-safari-800 text-white rounded-2xl shadow-lg ring-4 ring-safari-800/10">
+                  <ImageIcon size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl md:text-2xl font-black text-safari-900 leading-tight">
+                    Property Asset Manager
+                  </h3>
+                  <p className="text-[10px] text-safari-500 font-extrabold uppercase tracking-widest mt-0.5">
+                    Select high-quality visual assets for this property profile
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
                 <button 
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isUploading}
-                  className="px-6 py-3 bg-safari-800 text-white rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-safari-900 transition-all shadow-md"
+                  className="hidden md:flex px-6 py-3 bg-safari-800 text-white rounded-xl font-black uppercase text-[10px] tracking-widest items-center gap-2 hover:bg-safari-950 transition-all shadow-xl hover:-translate-y-0.5"
                 >
-                  <UploadCloud size={16} /> New Upload
+                  <UploadCloud size={16} /> {isUploading ? 'Uploading...' : 'Upload Asset'}
                 </button>
-                <button onClick={() => setIsStorageBrowserOpen(false)} className="p-2 text-safari-400 hover:text-safari-900 transition-colors">
+                <button 
+                  onClick={() => setIsStorageBrowserOpen(false)} 
+                  className="p-2 text-safari-400 hover:text-safari-900 transition-colors hover:bg-safari-100 rounded-full"
+                >
                   <X size={28} />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-10 bg-gray-50/30">
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 bg-gray-50/50">
               {storageImages.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
                   {storageImages.map((img, idx) => {
@@ -662,56 +670,87 @@ const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies 
                       <div 
                         key={idx} 
                         onClick={() => selectImage(img.url)}
-                        className={`group relative aspect-[4/5] rounded-[1.5rem] overflow-hidden transition-all duration-500 cursor-pointer shadow-sm hover:shadow-2xl border-2 ${
-                          isSelected ? 'border-safari-600 ring-8 ring-safari-600/10 scale-[0.98]' : 'border-transparent hover:border-safari-200 hover:-translate-y-1'
+                        className={`group relative aspect-[4/5] rounded-[1.8rem] overflow-hidden transition-all duration-500 cursor-pointer shadow-md hover:shadow-2xl border-2 ${
+                          isSelected ? 'border-safari-600 ring-8 ring-safari-600/10 scale-[0.98]' : 'border-transparent hover:border-safari-400 hover:-translate-y-1.5'
                         }`}
                       >
                         <img src={img.url} alt={img.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" referrerPolicy="no-referrer" />
-                        <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-300 ${
-                          isSelected ? 'bg-safari-900/40 opacity-100' : 'bg-safari-900/0 group-hover:bg-safari-900/40 opacity-0 group-hover:opacity-100'
+                        
+                        <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-400 ${
+                          isSelected ? 'bg-safari-950/40 opacity-100' : 'bg-safari-950/0 group-hover:bg-safari-950/40 opacity-0 group-hover:opacity-100'
                         }`}>
                           {isSelected ? (
-                            <div className="bg-white text-safari-900 p-3 rounded-full shadow-2xl animate-bounce">
-                              <Check size={24} strokeWidth={4} />
+                            <div className="bg-white text-safari-800 p-4 rounded-full shadow-2xl animate-bounce">
+                              <Check size={28} strokeWidth={4} />
                             </div>
                           ) : (
-                            <div className="bg-white/90 backdrop-blur-md text-safari-900 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/20 shadow-xl">
-                              Pick Asset
+                            <div className="bg-white/95 backdrop-blur-md text-safari-900 px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] border border-white/20 shadow-2xl transition-all hover:scale-110">
+                              Attach
                             </div>
                           )}
                         </div>
-                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-safari-900/80 via-safari-900/40 to-transparent pt-10">
-                          <p className="text-[9px] text-white/90 font-black uppercase tracking-widest truncate">{img.name}</p>
+
+                        {/* Labels */}
+                        <div className="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-safari-950/90 via-safari-950/40 to-transparent pt-12 transform translate-y-2 group-hover:translate-y-0 transition-transform">
+                          <p className="text-[9px] text-white/95 font-bold uppercase tracking-[0.2em] truncate drop-shadow-md">
+                            {img.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ")}
+                          </p>
                         </div>
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                <div className="h-full flex flex-col items-center justify-center text-safari-300 space-y-6">
-                  <div className="w-16 h-16 border-4 border-safari-100 border-t-safari-500 rounded-full animate-spin" />
-                  <p className="text-xs font-black uppercase tracking-[0.3em] animate-pulse">Syncing Archive...</p>
+                <div className="h-full flex flex-col items-center justify-center text-safari-300 space-y-6 py-20">
+                  <div className="relative">
+                    <div className="w-20 h-20 border-4 border-safari-100 border-t-safari-800 rounded-full animate-spin" />
+                    <Building size={24} className="absolute inset-0 m-auto text-safari-800 animate-pulse" />
+                  </div>
+                  <div className="text-center space-y-1">
+                    <p className="text-xs font-black uppercase tracking-[0.3em] text-safari-900 animate-pulse">Syncing Portfolio...</p>
+                    <p className="text-[10px] font-bold text-safari-400 uppercase tracking-widest">Accessing secure cloud storage</p>
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="p-8 border-t border-safari-100 bg-safari-50/50 flex justify-between items-center px-10">
-              <div className="flex items-center gap-4">
-                <div className="px-5 py-2 bg-white rounded-full border border-safari-100 shadow-sm">
-                   <p className="text-[10px] text-safari-600 font-bold uppercase tracking-widest">
-                     {formData.images?.length || 0} Assets Selected
-                   </p>
+            {/* Footer */}
+            <div className="p-6 md:p-8 border-t border-safari-100 bg-white sticky bottom-0 z-20 flex flex-col sm:flex-row justify-between items-center gap-6">
+              <div className="flex items-center gap-6">
+                <div className="flex -space-x-3">
+                  {(formData.images?.slice(0, 5) || []).map((url, i) => (
+                    <div key={i} className="w-10 h-10 rounded-full border-2 border-white overflow-hidden shadow-lg bg-safari-50">
+                      <img src={url} className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                  {(formData.images?.length || 0) > 5 && (
+                    <div className="w-10 h-10 rounded-full border-2 border-white bg-safari-800 text-white flex items-center justify-center text-[10px] font-black shadow-lg">
+                      +{(formData.images?.length || 0) - 5}
+                    </div>
+                  )}
+                </div>
+                <div className="h-10 w-[1px] bg-safari-100 hidden sm:block" />
+                <div>
+                  <p className="text-[10px] text-safari-800 font-black uppercase tracking-widest">
+                    {(formData.images?.length || 0)} Assets Selected
+                  </p>
+                  <p className="text-[9px] text-safari-400 font-bold uppercase tracking-wider mt-0.5">
+                    Updated visuals for the property profile
+                  </p>
                 </div>
               </div>
-              <button 
-                onClick={() => setIsStorageBrowserOpen(false)}
-                className="px-14 py-4 bg-safari-900 text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:bg-black transition-all active:scale-95"
-              >
-                Finished Selecting
-              </button>
+              <div className="flex gap-4 w-full sm:w-auto">
+                <button 
+                  onClick={() => setIsStorageBrowserOpen(false)}
+                  className="flex-1 sm:flex-none px-12 py-4 bg-safari-900 text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:bg-black transition-all active:scale-95 hover:shadow-safari-900/20"
+                >
+                  Done Selecting
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
