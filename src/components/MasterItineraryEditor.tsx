@@ -335,30 +335,32 @@ const MasterItineraryEditor: React.FC<MasterItineraryEditorProps> = ({ safari, l
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-xl overflow-hidden flex flex-col animate-fadeIn border border-safari-100 min-h-[80vh]">
-      {/* Header */}
-      <div className="p-8 border-b border-safari-100 flex justify-between items-center bg-safari-50">
-        <div>
-          <h2 className="text-3xl font-black text-safari-900 flex items-center gap-3">
-            <div className="w-12 h-12 bg-safari-400 rounded-lg flex items-center justify-center text-white shadow-lg">
-               <Bookmark size={24} />
-            </div>
-            {safari?.id ? 'Edit Signature Safari' : 'New Master Itinerary'}
-          </h2>
-          <p className="text-sm text-safari-500 font-bold uppercase tracking-widest mt-2 flex items-center gap-2">
-            Signature Catalog Builder
-          </p>
+    <>
+      <div className="bg-white rounded-xl shadow-xl overflow-hidden flex flex-col animate-fadeIn border border-safari-100 min-h-[80vh]">
+        {/* Header */}
+        <div className="p-8 border-b border-safari-100 flex justify-between items-center bg-safari-50">
+          <div>
+            <h2 className="text-3xl font-black text-safari-900 flex items-center gap-3">
+              <div className="w-12 h-12 bg-safari-400 rounded-lg flex items-center justify-center text-white shadow-lg">
+                 <Bookmark size={24} />
+              </div>
+              {safari?.id ? 'Edit Signature Safari' : 'New Master Itinerary'}
+            </h2>
+            <p className="text-sm text-safari-500 font-bold uppercase tracking-widest mt-2 flex items-center gap-2">
+              Signature Catalog Builder
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="px-6 py-3 font-bold text-safari-500 hover:bg-safari-200 rounded-xl transition-colors">Exit</button>
+            <button onClick={handleSave} disabled={isSaving} className="px-10 py-3 bg-safari-800 text-white rounded-lg font-black uppercase text-xs tracking-widest hover:bg-safari-900 transition-all shadow-xl active:scale-95 disabled:opacity-50 flex items-center gap-2">
+              {isSaving ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
+              {safari?.id ? 'Save Changes' : 'Publish Safari'}
+            </button>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <button onClick={onClose} className="px-6 py-3 font-bold text-safari-500 hover:bg-safari-200 rounded-xl transition-colors">Exit</button>
-          <button onClick={handleSave} disabled={isSaving} className="px-10 py-3 bg-safari-800 text-white rounded-lg font-black uppercase text-xs tracking-widest hover:bg-safari-900 transition-all shadow-xl active:scale-95 disabled:opacity-50 flex items-center gap-2">
-            {isSaving ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
-            {safari?.id ? 'Save Changes' : 'Publish Safari'}
-          </button>
-        </div>
-      </div>
 
-      <div className="flex-1 p-10 space-y-16">
+        <div className="flex-1 p-10 space-y-16">
+          {/* ... (rest of the content remains the same) ... */}
         {/* Basic Info */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <div className="lg:col-span-1 space-y-4">
@@ -799,18 +801,22 @@ const MasterItineraryEditor: React.FC<MasterItineraryEditorProps> = ({ safari, l
           {isSaving ? 'Processing...' : 'Save Signature Safari'}
         </button>
       </div>
+    </div>
 
-      {/* Storage Browser Modal */}
+    {/* Storage Browser Modal */}
       {isStorageBrowserOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 bg-safari-900/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white w-full max-w-5xl h-full max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-safari-100 flex justify-between items-center bg-safari-50">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8 bg-safari-900/95 backdrop-blur-md animate-fadeIn">
+          <div className="bg-white w-full max-w-6xl h-full max-h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col scale-in-center border border-white/10">
+            <div className="p-8 border-b border-safari-100 flex justify-between items-center bg-safari-50/50">
               <div>
-                <h3 className="text-xl font-black text-safari-900 flex items-center gap-2">
-                  <ImageIcon className="text-safari-500" /> {selectionMode === 'hero' ? 'Select Hero Image' : 'Image Library'}
+                <h3 className="text-2xl font-black text-safari-900 flex items-center gap-3">
+                  <div className="p-2 bg-safari-100 rounded-lg text-safari-600">
+                    <ImageIcon size={24} />
+                  </div>
+                  {selectionMode === 'hero' ? 'Select Hero Image' : selectionMode === 'section' ? 'Select Section Image' : 'Image Library'}
                 </h3>
-                <p className="text-xs text-safari-500 font-bold uppercase tracking-widest mt-1">
-                  {selectionMode === 'hero' ? 'Choose a striking image for the top banner' : 'Select images from your storage'}
+                <p className="text-[10px] text-safari-500 font-black uppercase tracking-[0.2em] mt-1 ml-12">
+                  {selectionMode === 'hero' ? 'Strike a chord with a high-impact banner' : 'Curate your safari visuals'}
                 </p>
               </div>
               <div className="flex items-center gap-4">
@@ -827,65 +833,71 @@ const MasterItineraryEditor: React.FC<MasterItineraryEditorProps> = ({ safari, l
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8">
+            <div className="flex-1 overflow-y-auto p-10 bg-gray-50/30">
               {storageImages.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
                   {storageImages.map((img, idx) => {
                     const isSelected = selectionMode === 'hero' 
                       ? formData.heroImage === img.url
-                      : formData.gallery?.includes(img.url);
+                      : selectionMode === 'section'
+                        ? (activeSectionIdx !== null && formData.schedule[activeSectionIdx].sectionImage === img.url)
+                        : formData.gallery?.includes(img.url);
                     return (
                       <div 
                         key={idx} 
                         onClick={() => selectImage(img.url)}
-                        className={`group relative aspect-square rounded-2xl overflow-hidden border-4 transition-all cursor-pointer ${
-                          isSelected ? 'border-safari-500 ring-4 ring-safari-500/20' : 'border-transparent hover:border-safari-200'
+                        className={`group relative aspect-[4/5] rounded-[1.5rem] overflow-hidden transition-all duration-500 cursor-pointer shadow-sm hover:shadow-2xl border-2 ${
+                          isSelected ? 'border-safari-600 ring-8 ring-safari-600/10 scale-[0.98]' : 'border-transparent hover:border-safari-200 hover:-translate-y-1'
                         }`}
                       >
-                        <img src={img.url} alt={img.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${
-                          isSelected ? 'bg-safari-500/20 opacity-100' : 'bg-black/40 opacity-0 group-hover:opacity-100'
+                        <img src={img.url} alt={img.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" referrerPolicy="no-referrer" />
+                        <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-300 ${
+                          isSelected ? 'bg-safari-900/40 opacity-100' : 'bg-safari-900/0 group-hover:bg-safari-900/40 opacity-0 group-hover:opacity-100'
                         }`}>
                           {isSelected ? (
-                            <div className="bg-safari-500 text-white p-2 rounded-full shadow-lg">
-                              <Check size={20} strokeWidth={3} />
+                            <div className="bg-white text-safari-900 p-3 rounded-full shadow-2xl animate-bounce">
+                              <Check size={24} strokeWidth={4} />
                             </div>
                           ) : (
-                            <div className="bg-white/20 backdrop-blur-md text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/40">
-                              Select
+                            <div className="bg-white/90 backdrop-blur-md text-safari-900 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/20 shadow-xl">
+                              Pick Image
                             </div>
                           )}
                         </div>
-                        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
-                          <p className="text-[8px] text-white font-bold truncate">{img.name}</p>
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-safari-900/80 via-safari-900/40 to-transparent pt-10">
+                          <p className="text-[9px] text-white/90 font-black uppercase tracking-widest truncate">{img.name}</p>
                         </div>
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                <div className="h-full flex flex-col items-center justify-center text-safari-300 space-y-4">
-                  <RefreshCw size={48} className="animate-spin opacity-20" />
-                  <p className="text-sm font-black uppercase tracking-widest">Loading Library...</p>
+                <div className="h-full flex flex-col items-center justify-center text-safari-300 space-y-6">
+                  <div className="w-16 h-16 border-4 border-safari-100 border-t-safari-500 rounded-full animate-spin" />
+                  <p className="text-xs font-black uppercase tracking-[0.3em] animate-pulse">Accessing Archive...</p>
                 </div>
               )}
             </div>
 
-            <div className="p-6 border-t border-safari-100 bg-safari-50 flex justify-between items-center">
-              <p className="text-xs text-safari-500 font-bold">
-                {formData.gallery?.length || 0} images selected for this safari
-              </p>
+            <div className="p-8 border-t border-safari-100 bg-safari-50/50 flex justify-between items-center px-10">
+              <div className="flex items-center gap-4">
+                <div className="px-5 py-2 bg-white rounded-full border border-safari-100 shadow-sm">
+                   <p className="text-[10px] text-safari-600 font-bold uppercase tracking-widest">
+                     {formData.gallery?.length || 0} Assets Linked
+                   </p>
+                </div>
+              </div>
               <button 
                 onClick={() => setIsStorageBrowserOpen(false)}
-                className="px-10 py-3 bg-safari-800 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-safari-900 transition-all"
+                className="px-14 py-4 bg-safari-900 text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:bg-black transition-all active:scale-95"
               >
-                Done Selecting
+                Close Library
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

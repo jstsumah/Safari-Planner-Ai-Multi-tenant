@@ -27,7 +27,6 @@ export interface Company {
   branding?: BrandingConfig;
   created_at?: string;
   updated_at?: string;
-  status?: 'active' | 'suspended';
 }
 
 export interface Profile {
@@ -40,7 +39,13 @@ export interface Profile {
   user_type: 'agency' | 'user' | 'provider';
   created_at?: string;
   updated_at?: string;
-  status?: 'active' | 'suspended';
+}
+
+export interface PartnerLogo {
+  id: string;
+  name: string;
+  logoUrl: string;
+  websiteUrl?: string;
 }
 
 export interface BrandingConfig {
@@ -97,6 +102,7 @@ export interface BrandingConfig {
   establishedYear?: string;
   statistics?: { label: string; value: string; iconType: 'heart' | 'globe' | 'shield' | 'award' | 'users' | 'star' }[];
   socialLinks?: { platform: string; url: string }[];
+  globalPartners?: PartnerLogo[];
   parkFees?: { name: string; keywords: string[]; rate: number }[];
   transportRates?: { type: string; dailyRate: number }[];
   defaultMarkup?: number;

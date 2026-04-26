@@ -125,7 +125,7 @@ const CostingModule: React.FC<CostingModuleProps> = ({
       }
 
       const ai = new GoogleGenAI({ apiKey });
-      const modelId = 'gemini-3-flash-preview';
+      const modelId = 'gemini-1.5-flash';
 
       const prompt = `
         You are an expert safari operations assistant. 
@@ -154,12 +154,10 @@ const CostingModule: React.FC<CostingModuleProps> = ({
 
       const response = await ai.models.generateContent({
         model: modelId,
-        contents: {
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType: file.type, data: base64Data } }
-          ]
-        },
+        contents: [
+          { text: prompt },
+          { inlineData: { mimeType: file.type, data: base64Data } }
+        ],
         config: {
           responseMimeType: "application/json"
         }
@@ -168,7 +166,13 @@ const CostingModule: React.FC<CostingModuleProps> = ({
       const text = response.text;
       if (!text) throw new Error("Empty AI response");
       
-      const result = JSON.parse(text);
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        console.error("Failed to parse AI response:", text);
+        throw new Error("AI returned invalid data format. Please try another file.", { cause: e });
+      }
       
       const extractedItems = Array.isArray(result) ? result : (result.items || []);
       const foundPax = result.pax || (formData.adults + formData.youngAdults + formData.children) || 1;

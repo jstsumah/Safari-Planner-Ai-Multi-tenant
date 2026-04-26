@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Plus, Trash2, Save, Building, Building2, LogOut, Loader2, 
-  Edit3, 
+  Edit3, Home,
   LayoutDashboard, MessageSquare, Menu, ChevronLeft, ChevronDown, ChevronUp,
   RefreshCw, Compass, MapPin, Mail, Phone,
   Eye, ReceiptText, FileText, CreditCard,
@@ -127,8 +127,8 @@ const DEFAULT_BRANDING: BrandingConfig = {
   h6FontSize: '18px',
   h6FontWeight: '600',
   h6LetterSpacing: '0',
-  agencyName: 'SafariPlanner Agency',
-  agencyDescription: 'A premium safari agency providing bespoke African adventures with expert local guides and sustainable practices.',
+  agencyName: 'SafariPlanner.ai',
+  agencyDescription: 'Expert-grade African adventures in seconds.',
   contactEmail: 'hello@safariplanner.ai',
   contactPhone: '+254 700 000 000',
   contactAddress: 'Nairobi, Kenya',
@@ -199,8 +199,6 @@ const DEFAULT_BRANDING: BrandingConfig = {
     ],
     accommodationTypes: ["Lodge", "Tented Camp", "Boutique Hotel", "Private Villa", "Mobile Camp"]
   },
-  agencyName: 'SafariPlanner.ai',
-  agencyDescription: 'Expert-grade African adventures in seconds.',
   socialLinks: [],
   parkFees: [],
   transportRates: [],
@@ -237,7 +235,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [isQuotesLoading, setIsQuotesLoading] = useState(false);
   const [isMasterLoading, setIsMasterLoading] = useState(false);
   const [isTeamLoading, setIsTeamLoading] = useState(false);
-  const [isCustomRatesLoading, setIsCustomRatesLoading] = useState(false);
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   
   const [lodges, setLodges] = useState<Lodge[]>([]);
@@ -256,6 +253,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   // Super Hub Add States
   const [isAddCompanyOpen, setIsAddCompanyOpen] = useState(false);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [isAddPartnerOpen, setIsAddPartnerOpen] = useState(false);
   const [newCompanyData, setNewCompanyData] = useState({
     name: '',
     slug: '',
@@ -265,8 +263,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     full_name: '',
     email: '',
     company_id: '',
-    user_type: 'agency' as 'agency' | 'user' | 'provider',
-    status: 'active' as 'active' | 'suspended'
+    user_type: 'agency' as 'agency' | 'user' | 'provider'
+  });
+  const [newPartnerData, setNewPartnerData] = useState({
+    name: '',
+    logoUrl: '',
+    websiteUrl: ''
   });
 
   // Team Management State
@@ -325,14 +327,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
   const fetchCustomRates = useCallback(async () => {
     if (!company) return;
-    setIsCustomRatesLoading(true);
     try {
       const { data, error } = await supabase.from('lodge_custom_rates')
         .select('*')
         .eq('company_id', company.id);
       if (error) throw error;
       setCustomRates(data || []);
-    } catch (err: any) { console.error(err); } finally { setIsCustomRatesLoading(false); }
+    } catch (err: any) { console.error(err); }
   }, [company]);
 
   const fetchMasterItineraries = useCallback(async () => {
@@ -438,7 +439,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     
     // Always fetch global branding for super admin management
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('companies')
         .select('branding')
         .eq('slug', 'system')
@@ -447,7 +448,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       if (data?.branding) {
         setGlobalBranding(data.branding);
       }
-    } catch (e) {
+    } catch {
       console.warn("Global system branding not found, using defaults.");
       setGlobalBranding(DEFAULT_BRANDING);
     }
@@ -775,6 +776,62 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     } catch (err: any) { toast.error(err.message); } finally { setIsLoading(false); }
   };
 
+  const handleSavePartner = async () => {
+    if (!newPartnerData.name || !newPartnerData.logoUrl) {
+      toast.error("Partner name and logo URL are required.");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const updatedPartners = [
+        ...(globalBranding.globalPartners || []),
+        { id: `ptr-${Date.now()}`, ...newPartnerData }
+      ];
+      
+      const { data: systemCo } = await supabase.from('companies').select('id').eq('slug', 'system').single();
+      if (!systemCo) throw new Error("System company not found.");
+
+      const { error } = await supabase
+        .from('companies')
+        .update({ branding: { ...globalBranding, globalPartners: updatedPartners } })
+        .eq('id', systemCo.id);
+      
+      if (error) throw error;
+      toast.success("Partner added to slideshow.");
+      setGlobalBranding({ ...globalBranding, globalPartners: updatedPartners });
+      setIsAddPartnerOpen(false);
+      setNewPartnerData({ name: '', logoUrl: '', websiteUrl: '' });
+    } catch (err: any) {
+      toast.error("Failed to add partner: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeletePartner = async (partnerId: string) => {
+    if (!window.confirm("Remove this partner from the homepage slideshow?")) return;
+    setIsLoading(true);
+    try {
+      const updatedPartners = (globalBranding.globalPartners || []).filter(p => p.id !== partnerId);
+      
+      const { data: systemCo } = await supabase.from('companies').select('id').eq('slug', 'system').single();
+      if (!systemCo) throw new Error("System company not found.");
+
+      const { error } = await supabase
+        .from('companies')
+        .update({ branding: { ...globalBranding, globalPartners: updatedPartners } })
+        .eq('id', systemCo.id);
+      
+      if (error) throw error;
+      toast.success("Partner removed.");
+      setGlobalBranding({ ...globalBranding, globalPartners: updatedPartners });
+    } catch (err: any) {
+      toast.error("Failed to remove partner: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleCostingClick = (lead: any) => {
     setNavigationSource(activeTab);
     setSelectedLead(lead);
@@ -995,7 +1052,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         email: newUserData.email,
         company_id: newUserData.company_id || null,
         user_type: newUserData.user_type,
-        status: newUserData.status,
         is_super_user: false
       }]);
       if (error) throw error;
@@ -1040,7 +1096,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         </div>
 
         <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          <NavItem icon={<LayoutDashboard size={22} />} label="Home" isActive={activeTab === 'dashboard'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('dashboard')} />
+          <NavItem icon={<Home size={22} />} label="Home" isActive={false} collapsed={isSidebarCollapsed} onClick={onClose} />
+          <NavItem icon={<LayoutDashboard size={22} />} label="Dashboard" isActive={activeTab === 'dashboard'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('dashboard')} />
           <NavItem icon={<Building size={22} />} label="Properties" isActive={activeTab === 'properties' || activeTab === 'property_edit' || activeTab === 'property_view'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('properties')} />
           <NavItem icon={<Bookmark size={22} />} label="Signature Safaris" isActive={activeTab === 'signature_safaris' || activeTab === 'safari_edit'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('signature_safaris')} />
           <NavItem icon={<Users size={22} />} label="Team" isActive={activeTab === 'team'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('team')} />
@@ -1100,12 +1157,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             </button>
           </Tooltip>
 
-          <Tooltip content="Return to Planner">
-            <button onClick={onClose} className="text-safari-400 hover:text-white transition-colors">
-              <RefreshCw size={20} />
-            </button>
-          </Tooltip>
-          
           <Tooltip content="Configuration Settings">
             <button 
               onClick={() => setActiveTab('settings')} 
@@ -1189,11 +1240,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               setActiveTab('property_edit');
             }}
             onDeleteCompany={async (id: string) => {
-              if (!confirm("Remove this company? Note: This may fail if it has active data dependencies.")) return;
+              console.log("AdminPanel: onDeleteCompany called for ID:", id);
               try {
                 const { error } = await supabase.from('companies').delete().eq('id', id);
                 if (error) throw error;
-                toast.success("Company removed.");
+                toast.success("Company and all related data removed.");
+                fetchGlobalData();
+              } catch (err: any) { 
+                console.error("Delete error:", err);
+                toast.error(err.message || "Failed to delete company. Ensure all dependent records are removed first."); 
+              }
+            }}
+            onUpdateCompanyStatus={async (id: string, status: string) => {
+              try {
+                const { error } = await supabase.from('companies').update({ status }).eq('id', id);
+                if (error) throw error;
+                toast.success(`Company status updated to ${status}.`);
                 fetchGlobalData();
               } catch (err: any) { toast.error(err.message); }
             }}
@@ -1218,34 +1280,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 fetchQuotations();
               } catch (err: any) { toast.error(err.message); }
             }}
-            onUpdateCompanyStatus={async (id: string, status: 'active' | 'suspended') => {
-              try {
-                const { error } = await supabase.from('companies').update({ status }).eq('id', id);
-                if (error) throw error;
-                toast.success(`Company ${status === 'active' ? 'activated' : 'suspended'}.`);
-                fetchGlobalData();
-              } catch (err: any) { toast.error(err.message); }
-            }}
-            onUpdateUserStatus={async (id: string, status: 'active' | 'suspended') => {
-              try {
-                const { error } = await supabase.from('profiles').update({ status }).eq('id', id);
-                if (error) throw error;
-                toast.success(`User ${status === 'active' ? 'activated' : 'suspended'}.`);
-                fetchGlobalData();
-              } catch (err: any) { toast.error(err.message); }
-            }}
             onAddCompany={() => {
               setNewCompanyData({ name: '', slug: '', branding: DEFAULT_BRANDING });
               setIsAddCompanyOpen(true);
             }}
             onAddUser={() => {
-              setNewUserData({ full_name: '', email: '', company_id: '', user_type: 'agency', status: 'active' });
+              setNewUserData({ full_name: '', email: '', company_id: '', user_type: 'agency' });
               setIsAddUserOpen(true);
             }}
             onAddProperty={() => {
               setSelectedLodge(null);
               setActiveTab('property_edit');
             }}
+            globalBranding={globalBranding}
+            onAddPartner={() => setIsAddPartnerOpen(true)}
+            onDeletePartner={handleDeletePartner}
           />
         )}
 
@@ -2716,6 +2765,82 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         </div>
       )}
 
+      {isAddPartnerOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-scaleIn">
+            <div className="bg-safari-900 p-6 text-white flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold font-serif italic tracking-tight">Add Homepage Partner</h2>
+                <p className="text-safari-300 text-sm italic tracking-tight">Set up a logo for the landing page slideshow</p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setIsAddPartnerOpen(false)} 
+                className="text-white/60 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-full"
+              >
+                <Plus className="rotate-45" size={24} />
+              </button>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-safari-400 tracking-widest">Partner name *</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Kenya Airways"
+                    value={newPartnerData.name}
+                    onChange={(e) => setNewPartnerData({...newPartnerData, name: e.target.value})}
+                    className="w-full px-5 py-3 bg-safari-50 border border-safari-100 rounded-xl focus:ring-2 focus:ring-safari-500 outline-none font-bold text-safari-900 placeholder:text-safari-300 transition-all shadow-inner"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-safari-400 tracking-widest">Logo URL *</label>
+                  <input 
+                    type="text" 
+                    placeholder="https://example.com/logo.png"
+                    value={newPartnerData.logoUrl}
+                    onChange={(e) => setNewPartnerData({...newPartnerData, logoUrl: e.target.value})}
+                    className="w-full px-5 py-3 bg-safari-50 border border-safari-100 rounded-xl focus:ring-2 focus:ring-safari-500 outline-none font-bold text-safari-900 placeholder:text-safari-300 transition-all shadow-inner"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-safari-400 tracking-widest">Website URL (Optional)</label>
+                  <input 
+                    type="text" 
+                    placeholder="https://partner.com"
+                    value={newPartnerData.websiteUrl}
+                    onChange={(e) => setNewPartnerData({...newPartnerData, websiteUrl: e.target.value})}
+                    className="w-full px-5 py-3 bg-safari-50 border border-safari-100 rounded-xl focus:ring-2 focus:ring-safari-500 outline-none font-bold text-safari-900 placeholder:text-safari-300 transition-all shadow-inner"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setIsAddPartnerOpen(false)}
+                  className="flex-1 px-6 py-4 border border-safari-200 text-safari-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-safari-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleSavePartner}
+                  disabled={isLoading}
+                  className="flex-1 px-6 py-4 bg-safari-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-safari-800 transition-all shadow-lg shadow-safari-900/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                  Save Partner
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isTeamModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-scaleIn">
@@ -2830,20 +2955,22 @@ const SuperHubView = ({
   lodges, 
   leads,
   masterItineraries,
+  globalBranding,
   onAssignLodge, 
   onEditLodge,
   onDeleteCompany,
+  onUpdateCompanyStatus,
   onDeleteUser,
   onDeleteProperty,
   onDeleteSafari,
   onDeleteLead,
-  onUpdateCompanyStatus,
-  onUpdateUserStatus,
   onAddCompany,
   onAddUser,
-  onAddProperty
+  onAddProperty,
+  onAddPartner,
+  onDeletePartner
 }: any) => {
-  const [activeSubTab, setActiveSubTab] = useState<'companies' | 'users' | 'inventory' | 'leads' | 'safaris'>('companies');
+  const [activeSubTab, setActiveSubTab] = useState<'companies' | 'users' | 'inventory' | 'leads' | 'safaris' | 'partners'>('companies');
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 animate-fadeIn">
@@ -2878,6 +3005,14 @@ const SuperHubView = ({
               <Plus size={16} /> Add Property
             </button>
           )}
+          {activeSubTab === 'partners' && (
+            <button 
+              onClick={onAddPartner}
+              className="px-6 py-2.5 bg-safari-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-safari-800 transition-all flex items-center gap-2 shadow-lg shadow-safari-900/20"
+            >
+              <Plus size={16} /> Add Slideshow Partner
+            </button>
+          )}
         </div>
       </div>
 
@@ -2887,7 +3022,8 @@ const SuperHubView = ({
           { id: 'users', label: 'Global Users', icon: <Users size={16} /> },
           { id: 'inventory', label: 'Inventory', icon: <Compass size={16} /> },
           { id: 'leads', label: 'All Leads', icon: <MessageSquare size={16} /> },
-          { id: 'safaris', label: 'All Safaris', icon: <Bookmark size={16} /> }
+          { id: 'safaris', label: 'All Safaris', icon: <Bookmark size={16} /> },
+          { id: 'partners', label: 'Partners', icon: <Building2 size={16} /> }
         ].map(tab => (
           <button
             key={tab.id}
@@ -2924,7 +3060,14 @@ const SuperHubView = ({
                         <Building size={20} />
                       </div>
                       <div>
-                        <p className="font-black text-safari-900 text-lg tracking-tight">{c.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-black text-safari-900 text-lg tracking-tight">{c.name}</p>
+                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest ${
+                            c.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                          }`}>
+                            {c.status || 'active'}
+                          </span>
+                        </div>
                         <p className="text-xs text-safari-400 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-xs">{c.id}</p>
                       </div>
                     </div>
@@ -2936,37 +3079,45 @@ const SuperHubView = ({
                     </span>
                   </td>
                   <td className="px-8 py-6 text-right relative">
-                    <div className="flex justify-end items-center gap-3 relative z-10 pointer-events-auto">
-                      <div className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-tighter ${
-                        c.status === 'suspended' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
-                      }`}>
-                        {c.status || 'active'}
-                      </div>
-                      <div className="flex gap-2 relative z-20">
+                    <div className="flex justify-end items-center gap-3">
+                      <div className="flex gap-2">
+                        {c.status === 'suspended' ? (
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onUpdateCompanyStatus(c.id, 'active');
+                            }}
+                            className="p-3 bg-green-50 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all shadow-sm border border-green-100 flex items-center justify-center min-w-[40px] cursor-pointer"
+                            title="Activate Company"
+                          >
+                            <Check size={18} />
+                          </button>
+                        ) : (
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              onUpdateCompanyStatus(c.id, 'suspended');
+                            }}
+                            className="p-3 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-600 hover:text-white transition-all shadow-sm border border-amber-100 flex items-center justify-center min-w-[40px] cursor-pointer"
+                            title="Suspend Company"
+                          >
+                            <ShieldAlert size={18} />
+                          </button>
+                        )}
                         <button 
                           type="button"
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            onUpdateCompanyStatus(c.id, c.status === 'suspended' ? 'active' : 'suspended');
+                            if (window.confirm("Permanently delete this company and all its data?")) {
+                              onDeleteCompany(c.id);
+                            }
                           }}
-                          className={`p-3 rounded-xl transition-all shadow-sm border flex items-center justify-center min-w-[40px] cursor-pointer pointer-events-auto relative z-30 ${
-                            c.status === 'suspended' 
-                            ? 'bg-green-50 text-green-600 border-green-100 hover:bg-green-600 hover:text-white' 
-                            : 'bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-600 hover:text-white'
-                          }`}
-                          title={c.status === 'suspended' ? 'Activate Company' : 'Suspend Company'}
-                        >
-                          {c.status === 'suspended' ? <ShieldCheck size={18} /> : <ShieldAlert size={18} />}
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onDeleteCompany(c.id);
-                          }}
-                          className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm border border-red-100 flex items-center justify-center min-w-[40px] cursor-pointer pointer-events-auto relative z-30"
+                          className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm border border-red-100 flex items-center justify-center min-w-[40px] cursor-pointer relative z-30"
                           title="Delete Company"
                         >
                           <Trash2 size={18} />
@@ -3021,28 +3172,7 @@ const SuperHubView = ({
                     <td className="px-8 py-6 text-right relative">
                       {!p.is_super_user && (
                         <div className="flex justify-end items-center gap-3 relative z-10 pointer-events-auto">
-                          <div className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-tighter ${
-                            p.status === 'suspended' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
-                          }`}>
-                            {p.status || 'active'}
-                          </div>
                           <div className="flex gap-2 relative z-20">
-                             <button 
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onUpdateUserStatus(p.id, p.status === 'suspended' ? 'active' : 'suspended');
-                              }}
-                              className={`p-3 rounded-xl transition-all shadow-sm border flex items-center justify-center min-w-[40px] cursor-pointer pointer-events-auto relative z-30 ${
-                                p.status === 'suspended' 
-                                ? 'bg-green-50 text-green-600 border-green-100 hover:bg-green-600 hover:text-white' 
-                                : 'bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-600 hover:text-white'
-                              }`}
-                              title={p.status === 'suspended' ? 'Activate User' : 'Suspend User'}
-                            >
-                              {p.status === 'suspended' ? <ShieldCheck size={18} /> : <ShieldAlert size={18} />}
-                            </button>
                             <button 
                               type="button"
                               onClick={(e) => {
@@ -3237,6 +3367,52 @@ const SuperHubView = ({
                   </tr>
                 );
               })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {activeSubTab === 'partners' && (
+        <div className="bg-white rounded-2xl shadow-xl border border-safari-100 overflow-hidden">
+          <table className="w-full text-left">
+            <thead className="bg-safari-900 text-white">
+              <tr>
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">Partner Info</th>
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">Link</th>
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-safari-50">
+              {(globalBranding.globalPartners || []).length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="px-8 py-12 text-center text-safari-400 font-medium">No partners configured for the homepage slideshow.</td>
+                </tr>
+              ) : globalBranding.globalPartners.map((p: any) => (
+                <tr key={p.id} className="hover:bg-safari-50/50 transition-colors">
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-12 bg-white rounded-xl border border-safari-100 flex items-center justify-center overflow-hidden shrink-0">
+                        <img src={p.logoUrl} className="max-w-full max-h-full object-contain" alt="" />
+                      </div>
+                      <span className="font-black text-safari-900 text-lg tracking-tight">{p.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <a href={p.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-safari-600 hover:underline font-medium text-sm flex items-center gap-1">
+                      <Globe size={14} /> {p.websiteUrl || 'No Link'}
+                    </a>
+                  </td>
+                  <td className="px-8 py-6 text-right">
+                    <button 
+                      onClick={() => onDeletePartner(p.id)}
+                      className="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm border border-red-100 flex items-center justify-center min-w-[40px] ml-auto cursor-pointer"
+                      title="Remove Partner"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

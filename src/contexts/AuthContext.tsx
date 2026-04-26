@@ -27,66 +27,84 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfileAndCompany = async (userId: string) => {
     setLoading(true);
+
+    // Initial check for placeholder/missing credentials to prevent hanging on invalid URLs
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    if (!supabaseUrl || supabaseUrl.includes('placeholder')) {
+      console.warn('Supabase not configured properly. Skipping profile fetch.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      console.log('Starting profile fetch for user:', userId);
+      // Create a promise that rejects after 30 seconds as a final safety net for the loading state
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Profile fetch timed out')), 30000)
+      );
 
-      if (profileError) {
-        if (profileError.code === 'PGRST116') {
-          // No profile yet, meant for onboarding
-          setProfile(null);
-          setCompany(null);
-          return;
-        }
-        throw profileError;
-      }
-      if (profileData?.status === 'suspended' && !profileData.is_super_user) {
-        toast.error("Your account has been suspended. Please contact support.");
-        await supabase.auth.signOut();
-        setProfile(null);
-        setCompany(null);
-        setLoading(false);
-        return;
-      }
-
-      setProfile(profileData);
-
-      if (profileData?.company_id) {
-        const { data: companyData, error: companyError } = await supabase
-          .from('companies')
+      const fetchPromise = (async () => {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
           .select('*')
-          .eq('id', profileData.company_id)
+          .eq('id', userId)
           .single();
 
-        if (companyError) throw companyError;
-
-        if (companyData?.status === 'suspended' && !profileData.is_super_user) {
-          toast.error("Your agency access has been suspended. Please contact support.");
-          await supabase.auth.signOut();
-          setProfile(null);
-          setCompany(null);
-          setLoading(false);
-          return;
+        if (profileError) {
+          console.error('Supabase profile error:', profileError);
+          if (profileError.code === 'PGRST116') {
+            return { profileData: null, companyData: null };
+          }
+          throw profileError;
         }
 
-        setCompany(companyData);
+        console.log('Profile data fetched successfully');
+
+        let companyData = null;
+        if (profileData?.company_id) {
+          console.log('Fetching company data for ID:', profileData.company_id);
+          const { data, error: companyError } = await supabase
+            .from('companies')
+            .select('*')
+            .eq('id', profileData.company_id)
+            .single();
+
+          if (companyError) {
+            console.error('Supabase company error:', companyError);
+            throw companyError;
+          }
+          companyData = data;
+          console.log('Company data fetched successfully');
+        }
+        return { profileData, companyData };
+      })();
+
+      const result = await Promise.race([fetchPromise, timeoutPromise]) as { profileData: any, companyData: any };
+      
+      if (result) {
+        setProfile(result.profileData);
+        setCompany(result.companyData);
       }
     } catch (error: any) {
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
         console.error('Network error - check if Supabase URL is correct or blocked by a browser extension:', error);
       } else {
-        console.error('Error fetching profile/company:', error);
+        console.error('Error fetching profile/company:', error.message || error);
       }
     } finally {
       setLoading(false);
+      console.log('Profile fetch workflow completed');
     }
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error('Session fetch error:', error);
+        if (error.message.includes('Refresh Token Not Found')) {
+          supabase.auth.signOut();
+        }
+      }
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -96,11 +114,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth event change:', event);
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfileAndCompany(session.user.id);
+        await fetchProfileAndCompany(session.user.id);
       } else {
         setProfile(null);
         setCompany(null);

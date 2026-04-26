@@ -4,7 +4,8 @@ import {
   Globe, ArrowRight, FileText, Bookmark,
   Users, ChevronRight, Play, Check, Calculator,
   Heart, User, Briefcase, Star, HelpCircle, 
-  Mail, Phone, MapPin, Plus, Minus, Menu, X, Building2
+  Mail, Phone, MapPin, Plus, Minus, Menu, X, Building2,
+  ChevronLeft
 } from 'lucide-react';
 import { Tooltip } from './ui/Tooltip';
 import { supabase } from '../lib/supabase';
@@ -40,7 +41,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
 
   React.useEffect(() => {
     const fetchCompanies = async () => {
-      const { data } = await supabase.from('companies').select('*').eq('status', 'active').limit(10);
+      const { data } = await supabase.from('companies').select('*').limit(10);
       if (data) setCompanies(data);
     };
     fetchCompanies();
@@ -49,9 +50,18 @@ const LandingPage: React.FC<LandingPageProps> = ({
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = React.useState(false);
 
+  const slideshowPartners = branding.globalPartners && branding.globalPartners.length > 0 
+    ? branding.globalPartners 
+    : companies.map(c => ({
+        id: c.id,
+        name: c.name,
+        logoUrl: '', // Fallback to Building2 icon for companies without explicit logos in branding
+        websiteUrl: `?company=${c.slug}`
+      }));
+
   React.useEffect(() => {
     const container = scrollRef.current;
-    if (!container || companies.length === 0 || isHovered) return;
+    if (!container || slideshowPartners.length === 0 || isHovered) return;
 
     let requestId: number;
     const scroll = () => {
@@ -64,7 +74,18 @@ const LandingPage: React.FC<LandingPageProps> = ({
 
     requestId = requestAnimationFrame(scroll);
     return () => cancelAnimationFrame(requestId);
-  }, [companies, isHovered]);
+  }, [slideshowPartners, isHovered]);
+
+  const handleManualScroll = (direction: 'left' | 'right') => {
+    const container = scrollRef.current;
+    if (!container) return;
+    
+    const scrollAmount = 300;
+    container.scrollTo({
+      left: container.scrollLeft + (direction === 'left' ? -scrollAmount : scrollAmount),
+      behavior: 'smooth'
+    });
+  };
 
   const [contactForm, setContactForm] = useState({
     name: '',
@@ -406,36 +427,58 @@ const LandingPage: React.FC<LandingPageProps> = ({
           </button>
         </div>
 
-        <div 
-          ref={scrollRef}
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          className="flex gap-6 overflow-x-auto pb-8 px-6 no-scrollbar snap-x transition-all"
-        >
-          {companies.length > 0 ? companies.map((partner) => (
-            <div 
-              key={partner.id} 
-              className="flex-shrink-0 w-80 bg-safari-50 p-8 rounded-3xl border border-safari-100 hover:shadow-xl hover:shadow-safari-900/5 transition-all snap-start group"
+        <div className="relative group/slideshow">
+          {/* Arrow Navigation */}
+          <div className="absolute inset-y-0 left-6 flex items-center z-20">
+            <button 
+              onClick={() => handleManualScroll('left')}
+              className="p-3 bg-white border border-safari-100 rounded-full shadow-lg text-safari-600 hover:bg-safari-900 hover:text-white hover:border-safari-900 transition-all opacity-0 group-hover/slideshow:opacity-100 -translate-x-4 group-hover/slideshow:translate-x-0"
             >
-              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-safari-600 mb-6 border border-safari-100 shadow-sm group-hover:scale-110 transition-transform">
-                <Building2 size={24} />
-              </div>
-              <h4 className="text-xl font-bold text-safari-900 mb-2 truncate">{partner.name}</h4>
-              <p className="text-safari-500 text-sm font-medium line-clamp-2 mb-6 h-10">
-                {partner.branding?.agencyDescription || "Official partner and specialist in curated African safari experiences."}
-              </p>
-              <button 
-                onClick={onViewPartners}
-                className="flex items-center gap-2 text-safari-900 font-black text-[10px] uppercase tracking-widest"
+              <ChevronLeft size={20} />
+            </button>
+          </div>
+          <div className="absolute inset-y-0 right-6 flex items-center z-20">
+            <button 
+              onClick={() => handleManualScroll('right')}
+              className="p-3 bg-white border border-safari-100 rounded-full shadow-lg text-safari-600 hover:bg-safari-900 hover:text-white hover:border-safari-900 transition-all opacity-0 group-hover/slideshow:opacity-100 translate-x-4 group-hover/slideshow:translate-x-0"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+
+          <div 
+            ref={scrollRef}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            className="flex gap-12 overflow-x-auto pb-8 px-6 no-scrollbar transition-all scroll-smooth"
+            style={{ msOverflowStyle: 'none', scrollbarWidth: 'none' }}
+          >
+            {/* Duplication for seamless scrolling removed to handle manual scroll better, or we can keep it if we adjust logic */}
+            {slideshowPartners.map((partner, idx) => (
+              <div 
+                key={`${partner.id}-${idx}`} 
+                className="flex-shrink-0 w-64 bg-safari-50 p-6 rounded-2xl border border-safari-100 hover:shadow-xl hover:shadow-safari-900/5 transition-all group/card flex flex-col items-center justify-center text-center space-y-4 grayscale hover:grayscale-0"
               >
-                Learn More <ChevronRight size={14} />
-              </button>
-            </div>
-          )) : (
-            [1,2,3,4,5].map(i => (
-              <div key={i} className="flex-shrink-0 w-80 h-64 bg-safari-50 rounded-3xl border border-safari-50 animate-pulse" />
-            ))
-          )}
+                <div className="w-24 h-16 bg-white rounded-xl flex items-center justify-center text-safari-400 overflow-hidden border border-safari-50">
+                  {partner.logoUrl ? (
+                    <img src={partner.logoUrl} alt={partner.name} className="max-w-full max-h-full object-contain" />
+                  ) : (
+                    <Building2 size={32} />
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-safari-900 px-2 truncate w-full">{partner.name}</h4>
+                </div>
+              </div>
+            ))}
+            {slideshowPartners.length === 0 && Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className="flex-shrink-0 w-64 h-32 bg-safari-50 rounded-2xl border border-safari-50 animate-pulse" />
+            ))}
+          </div>
+          
+          {/* Gradient Overlays for smooth blend */}
+          <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-white to-transparent pointer-events-none z-10" />
+          <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
         </div>
       </section>
 

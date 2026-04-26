@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Lodge, PropertyType, BudgetTier, Season, UnitCategory, SeasonalRate } from '../types';
 import { 
   X, Save, Plus, Trash2, Building, Info, 
-  LayoutGrid, Loader2,
+  LayoutGrid, Loader2, Search, Check,
   CalendarDays, ArrowRight, RefreshCw, Image as ImageIcon,
   Sparkles, Footprints, ListChecks, UploadCloud
 } from 'lucide-react';
@@ -72,8 +72,48 @@ const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies 
   
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isStorageBrowserOpen, setIsStorageBrowserOpen] = useState(false);
+  const [storageImages, setStorageImages] = useState<{name: string, url: string}[]>([]);
   const [tagInputs, setTagInputs] = useState({ facilities: '', amenities: '', activities: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchStorageImages = async () => {
+    if (!company) return;
+    try {
+      const { data: dbData, error: dbError } = await supabase
+        .from('gallery_images')
+        .select('*')
+        .eq('company_id', company.id)
+        .order('created_at', { ascending: false });
+
+      if (!dbError && dbData && dbData.length > 0) {
+        setStorageImages(dbData.map(img => ({ name: img.name, url: img.url })));
+        return;
+      }
+
+      const { data, error } = await supabase.storage.from('gallery').list();
+      if (error) throw error;
+      
+      const urls = data
+        .filter(file => file.name !== '.emptyFolderPlaceholder')
+        .map(file => {
+          const { data: { publicUrl } } = supabase.storage.from('gallery').getPublicUrl(file.name);
+          return { name: file.name, url: publicUrl };
+        });
+      setStorageImages(urls);
+    } catch (err: any) {
+      console.error("Library fetch error:", err);
+    }
+  };
+
+  const selectImage = (url: string) => {
+    const currentImages = formData.images || [];
+    if (currentImages.includes(url)) {
+      setFormData({ ...formData, images: currentImages.filter(u => u !== url) });
+    } else {
+      setFormData({ ...formData, images: [...currentImages, url] });
+    }
+  };
 
   const handleSave = async () => {
     if (!formData.name || !formData.location) {
@@ -247,7 +287,8 @@ const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies 
   };
 
   return (
-    <div className="bg-white w-full rounded-xl shadow-xl overflow-hidden flex flex-col animate-fadeIn border border-safari-100">
+    <>
+      <div className="bg-white w-full rounded-xl shadow-xl overflow-hidden flex flex-col animate-fadeIn border border-safari-100">
       <div className="p-8 border-b border-safari-100 flex justify-between items-center bg-safari-50">
         <div>
           <h2 className="text-3xl font-black text-safari-900 flex items-center gap-3">
@@ -410,28 +451,51 @@ const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies 
               <h3 className="text-lg font-black text-safari-900 flex items-center gap-2">
                  <ImageIcon className="text-safari-500" /> Digital Assets
               </h3>
-              <p className="text-sm text-safari-500 leading-relaxed">Gallery items for itineraries. Upload to storage or link external URLs.</p>
-              <div className="mt-6 space-y-4">
+              <p className="text-sm text-safari-500 leading-relaxed">Gallery items for itineraries. Upload to storage or select from your company library.</p>
+              <div className="mt-6 flex flex-col gap-3">
                 <input type="file" ref={fileInputRef} onChange={handleFileUpload} multiple accept="image/*" className="hidden" />
-                <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="w-full flex items-center justify-center gap-2 p-6 bg-white border-2 border-dashed border-safari-200 rounded-xl hover:bg-safari-50 transition-all">
-                  {isUploading ? <Loader2 className="animate-spin text-safari-600" /> : <UploadCloud className="text-safari-400" />}
-                  <span className="text-xs font-black uppercase">Upload Images</span>
+                <button 
+                  onClick={() => {
+                    setIsStorageBrowserOpen(true);
+                    fetchStorageImages();
+                  }}
+                  className="w-full px-6 py-4 bg-safari-800 text-white rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3 hover:bg-safari-900 transition-all shadow-lg"
+                >
+                  <Search size={18} /> Library Browser
+                </button>
+                <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="w-full flex items-center justify-center gap-3 p-4 bg-safari-100 text-safari-600 rounded-xl hover:bg-safari-200 transition-all font-black uppercase text-[10px] tracking-widest text-center">
+                  {isUploading ? <Loader2 className="animate-spin" size={18} /> : <UploadCloud size={18} />}
+                  <span>{isUploading ? 'Uploading...' : 'Direct Upload'}</span>
                 </button>
               </div>
             </div>
-            <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4">
-                {formData.images?.map((img, idx) => (
-                  <div key={idx} className="group relative aspect-video bg-safari-50 rounded-xl overflow-hidden border border-safari-200">
-                    <img src={img} className="w-full h-full object-cover" />
-                    <button onClick={() => {
-                        const updatedImages = [...(formData.images || [])];
-                        updatedImages.splice(idx, 1);
-                        setFormData({ ...formData, images: updatedImages });
-                    }} className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-lg transition-opacity">
-                        <Trash2 size={14} />
-                    </button>
+            <div className="lg:col-span-2 space-y-8">
+                {formData.images && formData.images.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                    {formData.images.map((img, idx) => (
+                      <div key={idx} className="group relative aspect-video bg-safari-50 rounded-2xl overflow-hidden border border-safari-100 shadow-md transform transition-all hover:scale-[1.02]">
+                        <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <div className="absolute inset-0 bg-safari-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button onClick={() => {
+                              const updatedImages = [...(formData.images || [])];
+                              updatedImages.splice(idx, 1);
+                              setFormData({ ...formData, images: updatedImages });
+                          }} className="p-3 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all shadow-xl">
+                              <Trash2 size={20} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <div className="py-20 border-2 border-dashed border-safari-100 rounded-3xl flex flex-col items-center justify-center text-safari-300 space-y-4 bg-safari-50/30">
+                    <ImageIcon size={64} strokeWidth={1} className="opacity-20" />
+                    <div className="text-center">
+                      <p className="text-sm font-black uppercase tracking-widest">No Images Yet</p>
+                      <p className="text-xs font-medium opacity-60">Populate your property profile with stunning visuals.</p>
+                    </div>
+                  </div>
+                )}
             </div>
           </div>
         </section>
@@ -558,6 +622,98 @@ const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies 
         </button>
       </div>
     </div>
+
+    {/* Storage Browser Modal */}
+      {isStorageBrowserOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 md:p-8 bg-safari-900/95 backdrop-blur-md animate-fadeIn">
+          <div className="bg-white w-full max-w-6xl h-full max-h-[90vh] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col border border-white/10">
+            <div className="p-8 border-b border-safari-100 flex justify-between items-center bg-safari-50/50">
+              <div>
+                <h3 className="text-2xl font-black text-safari-900 flex items-center gap-3">
+                  <div className="p-2 bg-safari-100 rounded-lg text-safari-600">
+                    <ImageIcon size={24} />
+                  </div>
+                  Property Asset Manager
+                </h3>
+                <p className="text-[10px] text-safari-500 font-black uppercase tracking-[0.2em] mt-1 ml-12">
+                  Select visual assets for this property profile
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="px-6 py-3 bg-safari-800 text-white rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-safari-900 transition-all shadow-md"
+                >
+                  <UploadCloud size={16} /> New Upload
+                </button>
+                <button onClick={() => setIsStorageBrowserOpen(false)} className="p-2 text-safari-400 hover:text-safari-900 transition-colors">
+                  <X size={28} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-10 bg-gray-50/30">
+              {storageImages.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                  {storageImages.map((img, idx) => {
+                    const isSelected = formData.images?.includes(img.url);
+                    return (
+                      <div 
+                        key={idx} 
+                        onClick={() => selectImage(img.url)}
+                        className={`group relative aspect-[4/5] rounded-[1.5rem] overflow-hidden transition-all duration-500 cursor-pointer shadow-sm hover:shadow-2xl border-2 ${
+                          isSelected ? 'border-safari-600 ring-8 ring-safari-600/10 scale-[0.98]' : 'border-transparent hover:border-safari-200 hover:-translate-y-1'
+                        }`}
+                      >
+                        <img src={img.url} alt={img.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" referrerPolicy="no-referrer" />
+                        <div className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-300 ${
+                          isSelected ? 'bg-safari-900/40 opacity-100' : 'bg-safari-900/0 group-hover:bg-safari-900/40 opacity-0 group-hover:opacity-100'
+                        }`}>
+                          {isSelected ? (
+                            <div className="bg-white text-safari-900 p-3 rounded-full shadow-2xl animate-bounce">
+                              <Check size={24} strokeWidth={4} />
+                            </div>
+                          ) : (
+                            <div className="bg-white/90 backdrop-blur-md text-safari-900 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/20 shadow-xl">
+                              Pick Asset
+                            </div>
+                          )}
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-safari-900/80 via-safari-900/40 to-transparent pt-10">
+                          <p className="text-[9px] text-white/90 font-black uppercase tracking-widest truncate">{img.name}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-safari-300 space-y-6">
+                  <div className="w-16 h-16 border-4 border-safari-100 border-t-safari-500 rounded-full animate-spin" />
+                  <p className="text-xs font-black uppercase tracking-[0.3em] animate-pulse">Syncing Archive...</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-8 border-t border-safari-100 bg-safari-50/50 flex justify-between items-center px-10">
+              <div className="flex items-center gap-4">
+                <div className="px-5 py-2 bg-white rounded-full border border-safari-100 shadow-sm">
+                   <p className="text-[10px] text-safari-600 font-bold uppercase tracking-widest">
+                     {formData.images?.length || 0} Assets Selected
+                   </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsStorageBrowserOpen(false)}
+                className="px-14 py-4 bg-safari-900 text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl hover:bg-black transition-all active:scale-95"
+              >
+                Finished Selecting
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

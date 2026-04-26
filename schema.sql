@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS companies (
     slug TEXT UNIQUE NOT NULL,
     branding JSONB,
     is_landing_enabled BOOLEAN DEFAULT true,
+    status TEXT DEFAULT 'active',
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );

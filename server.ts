@@ -5,7 +5,6 @@ import dotenv from 'dotenv';
 import path from 'path';
 import compression from 'compression';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import { expand } from 'dotenv-expand';
 import { createServer as createViteServer } from 'vite';
 
@@ -24,15 +23,6 @@ async function startServer() {
     crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: false,
   }));
-
-  // Rate limiting for API
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, 
-    max: 100, 
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-  app.use('/api/', limiter);
 
   app.use(compression());
   app.use(cors());
@@ -105,7 +95,10 @@ async function startServer() {
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { 
+        middlewareMode: true,
+        hmr: false
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

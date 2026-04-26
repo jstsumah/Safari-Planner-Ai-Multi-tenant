@@ -288,7 +288,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchSystemBranding = async () => {
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('companies')
           .select('branding')
           .eq('slug', 'system')
@@ -297,7 +297,7 @@ const App: React.FC = () => {
         if (data?.branding) {
           setSystemBranding(data.branding);
         }
-      } catch (e) {
+      } catch {
         console.warn("Global system branding not found, using defaults.");
       }
     };
@@ -320,8 +320,13 @@ const App: React.FC = () => {
 
       // Initialize landing page preference
       const savedLanding = localStorage.getItem('safari_config_landing_enabled');
-      if (savedLanding !== null) {
-        setIsLandingEnabled(JSON.parse(savedLanding));
+      if (savedLanding !== null && savedLanding !== "undefined") {
+        try {
+          setIsLandingEnabled(JSON.parse(savedLanding));
+        } catch (err) {
+          console.error("Failed to parse landing preference:", err);
+          setIsLandingEnabled(true);
+        }
       }
     }, 0);
     
@@ -338,7 +343,7 @@ const App: React.FC = () => {
   // 3. Listen for cross-tab storage changes
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'safari_config_branding' && e.newValue) {
+      if (e.key === 'safari_config_branding' && e.newValue && e.newValue !== "undefined") {
         try {
           const parsed = JSON.parse(e.newValue);
           setBranding(prev => JSON.stringify(prev) !== JSON.stringify(parsed) ? parsed : prev);
@@ -346,9 +351,13 @@ const App: React.FC = () => {
           console.error("Storage sync failed:", err);
         }
       }
-      if (e.key === 'safari_config_landing_enabled' && e.newValue) {
-        const parsed = JSON.parse(e.newValue);
-        setIsLandingEnabled(prev => prev !== parsed ? parsed : prev);
+      if (e.key === 'safari_config_landing_enabled' && e.newValue && e.newValue !== "undefined") {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setIsLandingEnabled(prev => prev !== parsed ? parsed : prev);
+        } catch (err) {
+          console.error("Storage sync failed (landing):", err);
+        }
       }
     };
 
@@ -518,105 +527,103 @@ const App: React.FC = () => {
     );
   }
 
-  if (viewMode === 'landing') {
-    return (
-      <LandingPage 
-        branding={systemBranding}
-        onViewProfile={() => setIsProfileOpen(true)}
-        onViewPartners={() => setViewMode('partners')}
-        onStart={() => {
-          if (user && profile) {
-            const userType = user.user_metadata?.user_type || (profile.company_id ? 'agency' : 'user');
-            setViewMode(userType === 'user' ? 'history' : 'admin');
-          } else {
-            setViewMode('form');
-          }
-        }} 
-        onAuth={() => {
-          if (user && profile) {
-            const userType = user.user_metadata?.user_type || (profile.company_id ? 'agency' : 'user');
-            setViewMode(userType === 'user' ? 'history' : 'admin');
-          } else {
-            setAuthMode('signin');
-            setAuthType('user');
-            setViewMode('auth');
-          }
-        }}
-        onAdmin={() => setViewMode('admin')} 
-        onCalculator={() => setViewMode('calculator')}
-        masterItineraries={masterItineraries}
-        isAuthenticated={!!user}
-      />
-    );
-  }
+  const renderViewContent = () => {
+    if (viewMode === 'landing') {
+      return (
+        <LandingPage 
+          branding={systemBranding}
+          onViewProfile={() => setIsProfileOpen(true)}
+          onViewPartners={() => setViewMode('partners')}
+          onStart={() => {
+            if (user && profile) {
+              const userType = user.user_metadata?.user_type || (profile.company_id ? 'agency' : 'user');
+              setViewMode(userType === 'user' ? 'history' : 'admin');
+            } else {
+              setViewMode('form');
+            }
+          }} 
+          onAuth={() => {
+            if (user && profile) {
+              const userType = user.user_metadata?.user_type || (profile.company_id ? 'agency' : 'user');
+              setViewMode(userType === 'user' ? 'history' : 'admin');
+            } else {
+              setAuthMode('signin');
+              setAuthType('user');
+              setViewMode('auth');
+            }
+          }}
+          onAdmin={() => setViewMode('admin')} 
+          onCalculator={() => setViewMode('calculator')}
+          masterItineraries={masterItineraries}
+          isAuthenticated={!!user}
+        />
+      );
+    }
 
-  // If we are in admin mode, we render the AdminPanel full-screen without the standard header
-  if (viewMode === 'admin') {
-    return (
-      <AdminPanel 
-        onClose={navigateHome} 
-      />
-    );
-  }
+    if (viewMode === 'partners') {
+      return (
+        <PartnersPage 
+          branding={branding}
+          onBack={() => setViewMode('landing')}
+          onViewProfile={(companyId) => {
+            setSelectedCompanyId(companyId);
+            setIsProfileOpen(true);
+          }}
+        />
+      );
+    }
 
-  // Standalone Calculator Mode (Public Access)
-  if (viewMode === 'calculator') {
-    return (
-      <div className="min-h-screen bg-safari-50">
-        {/* Public Tool Header */}
-        <header className="bg-safari-900 text-white p-4 shadow-lg">
-          <div className="max-w-6xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2 cursor-pointer" onClick={navigateHome}>
-              <Compass className="text-safari-400" size={24} />
-              <span className="font-extrabold text-lg tracking-tight">Safari<span className="text-safari-400">Calculator</span></span>
-            </div>
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={navigateHome}
-                className="text-xs font-bold text-safari-300 hover:text-white transition-colors bg-white/10 px-4 py-2 rounded-md border border-white/10"
-              >
-                Home
-              </button>
-              <div className="flex items-center gap-2 text-safari-400 text-[10px] font-bold uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
-                <Calculator size={14} /> Agent Tooling
+    if (viewMode === 'admin') {
+      return (
+        <AdminPanel 
+          onClose={navigateHome} 
+        />
+      );
+    }
+
+    if (viewMode === 'calculator') {
+      return (
+        <div className="min-h-screen bg-safari-50">
+          {/* Public Tool Header */}
+          <header className="bg-safari-900 text-white p-4 shadow-lg">
+            <div className="max-w-6xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-2 cursor-pointer" onClick={navigateHome}>
+                <Compass className="text-safari-400" size={24} />
+                <span className="font-extrabold text-lg tracking-tight">Safari<span className="text-safari-400">Calculator</span></span>
+              </div>
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={navigateHome}
+                  className="text-xs font-bold text-safari-300 hover:text-white transition-colors bg-white/10 px-4 py-2 rounded-md border border-white/10"
+                >
+                  Home
+                </button>
+                <div className="flex items-center gap-2 text-safari-400 text-[10px] font-bold uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
+                  <Calculator size={14} /> Agent Tooling
+                </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        <main className="p-4 md:p-8">
-          <CostingModule 
-            itinerary={DUMMY_ITINERARY_STANDALONE} 
-            formData={DUMMY_FORM_DATA_STANDALONE} 
-            lodges={lodges} 
-            branding={branding}
-            onBack={navigateHome} 
-            initialMode="calculator"
-          />
-        </main>
+          <main className="p-4 md:p-8">
+            <CostingModule 
+              itinerary={DUMMY_ITINERARY_STANDALONE} 
+              formData={DUMMY_FORM_DATA_STANDALONE} 
+              lodges={lodges} 
+              branding={branding}
+              onBack={navigateHome} 
+              initialMode="calculator"
+            />
+          </main>
 
-        <footer className="p-8 text-center text-safari-400 text-[10px] font-medium uppercase tracking-[0.2em]">
-          © 2026 SafariPlanner.ai • Powered by Intelligence, Crafted by Humans
-        </footer>
-      </div>
-    );
-  }
+          <footer className="p-8 text-center text-safari-400 text-[10px] font-medium uppercase tracking-[0.2em]">
+            © 2026 SafariPlanner.ai • Powered by Intelligence, Crafted by Humans
+          </footer>
+        </div>
+      );
+    }
 
-  if (viewMode === 'partners') {
     return (
-      <PartnersPage 
-        branding={branding}
-        onBack={() => setViewMode('landing')}
-        onViewProfile={(companyId) => {
-          setSelectedCompanyId(companyId);
-          setIsProfileOpen(true);
-        }}
-      />
-    );
-  }
-
-  return (
-    <>
       <div className="min-h-screen pb-10 bg-safari-50">
         <Toaster position="top-right" richColors />
         <header className="bg-white shadow-sm sticky top-0 z-50 border-b border-safari-200">
@@ -764,17 +771,25 @@ const App: React.FC = () => {
             />
           )}
         </main>
-        {isProfileOpen && (company || selectedCompanyId) && (
-          <CompanyProfile 
-            companyId={selectedCompanyId || company?.id || ''} 
-            branding={branding} 
-            onClose={() => {
-              setIsProfileOpen(false);
-              setSelectedCompanyId(null);
-            }} 
-          />
-        )}
       </div>
+    );
+  };
+
+  return (
+    <>
+      <Toaster position="top-right" richColors />
+      {renderViewContent()}
+      
+      {isProfileOpen && (company || selectedCompanyId) && (
+        <CompanyProfile 
+          companyId={selectedCompanyId || company?.id || ''} 
+          branding={branding} 
+          onClose={() => {
+            setIsProfileOpen(false);
+            setSelectedCompanyId(null);
+          }} 
+        />
+      )}
     </>
   );
 };

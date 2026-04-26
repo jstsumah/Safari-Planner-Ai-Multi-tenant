@@ -164,7 +164,7 @@ const PartnersPage: React.FC<PartnersPageProps> = ({ onBack, onViewProfile, bran
                     onClick={() => onViewProfile(company.id, company.branding || branding)}
                     className="w-full py-4 bg-safari-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-safari-800 transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg shadow-safari-900/10 group/btn"
                   >
-                    View Agent Reputation <ArrowRight size={16} className="group-hover/btn:translate-x-1 transition-transform" />
+                    View Company Profile <ArrowRight size={16} className="group-hover/btn:translate-x-1 transition-transform" />
                   </button>
                 </div>
               </div>
