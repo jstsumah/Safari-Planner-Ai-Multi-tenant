@@ -122,16 +122,14 @@ const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies 
       return;
     }
 
-    if (!formData.company_id && !isSuperUser) {
-      toast.error("Validation Error: Company assignment is required.");
+    const targetCompanyId = formData.company_id || company?.id;
+    if (!targetCompanyId) {
+      toast.error("Validation Error: Property must be associated with a company.");
       return;
     }
 
     setIsSaving(true);
     try {
-      const targetCompanyId = formData.company_id || company?.id;
-      if (!targetCompanyId) throw new Error("No target company found.");
-
       if (!isOwner && lodge?.id) {
         // Save Custom Rates purely for this company
         const { error } = await supabase
