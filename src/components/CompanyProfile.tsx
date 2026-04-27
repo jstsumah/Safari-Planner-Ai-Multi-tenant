@@ -150,7 +150,7 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
         </div>
 
         {/* Hero Section */}
-        <section className="relative h-96 rounded-2xl overflow-hidden shadow-2xl group">
+        <section className="relative h-96 rounded-xl overflow-hidden shadow-2xl group">
           <img 
             src={branding?.heroImage || "https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&q=80&w=2000"} 
             className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-[2s]"
@@ -181,8 +181,8 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {(branding?.statistics && branding.statistics.length > 0) ? (
             branding.statistics.map((stat: any, idx: number) => (
-              <div key={idx} className="bg-white p-8 rounded-xl shadow-sm border border-safari-50 flex flex-col items-center text-center space-y-3 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                <div className="p-4 bg-safari-50 rounded-xl">
+              <div key={idx} className="bg-white p-8 rounded-lg shadow-sm border border-safari-50 flex flex-col items-center text-center space-y-3 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                <div className="p-4 bg-safari-50 rounded-lg">
                   {React.cloneElement(getIcon(stat.iconType) as React.ReactElement, { size: 24 })}
                 </div>
                 <div>
@@ -198,8 +198,8 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
               { label: 'Wildlife Guides', value: '45+', icon: <Shield className="text-green-500" /> },
               { label: 'Awards Won', value: '12', icon: <Award className="text-amber-500" /> },
             ].map((stat, idx) => (
-              <div key={idx} className="bg-white p-8 rounded-xl shadow-sm border border-safari-50 flex flex-col items-center text-center space-y-3 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                <div className="p-4 bg-safari-50 rounded-xl">
+              <div key={idx} className="bg-white p-8 rounded-lg shadow-sm border border-safari-50 flex flex-col items-center text-center space-y-3 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                <div className="p-4 bg-safari-50 rounded-lg">
                   {React.cloneElement(stat.icon as React.ReactElement, { size: 24 })}
                 </div>
                 <div>
@@ -240,7 +240,7 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-6">
                 {team.length > 0 ? team.map((member) => (
                   <div key={member.id} className="group text-center space-y-3">
-                    <div className="relative aspect-square rounded-xl overflow-hidden shadow-lg border-4 border-white">
+                    <div className="relative aspect-square rounded-lg overflow-hidden shadow-lg border-4 border-white">
                       <img 
                         src={member.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${member.full_name}`} 
                         className="w-full h-full object-cover"

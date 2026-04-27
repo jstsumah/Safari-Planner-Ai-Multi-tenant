@@ -277,13 +277,17 @@ const LandingPage: React.FC<LandingPageProps> = ({
 
       {/* Hero Section */}
       <section className="relative pt-32 md:pt-40 pb-20 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6 md:space-y-8 animate-fadeIn">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-safari-100 rounded-full text-safari-600 font-bold text-[10px] uppercase tracking-widest">
               <Heart size={14} className="fill-safari-600" /> For Travelers & Professionals
             </div>
-            <h1 className="text-[60px] leading-[60px] w-[600px] h-[120px] font-extrabold text-safari-900 tracking-tighter">
-              {branding.heroTitle || 'The Art of the Safari, Decoded.'}
+            <h1 className="text-5xl sm:text-6xl md:text-[60px] leading-[1.1] md:leading-[60px] max-w-[640px] font-extrabold text-safari-900 tracking-tighter pr-4 md:pr-0">
+              {branding.heroTitle || (
+                <>
+                  The Art of the <span className="whitespace-nowrap">Safari, Decoded.</span>
+                </>
+              )}
             </h1>
             <p className="text-base md:text-xl text-safari-600 max-w-xl font-medium leading-relaxed">
               {branding.heroDescription || "Whether you're a DIY traveler planning a once-in-a-lifetime journey or a professional partner scaling your operations, our intelligence-assisted platform designs expert-grade African adventures in seconds."}
@@ -382,8 +386,8 @@ const LandingPage: React.FC<LandingPageProps> = ({
                       referrerPolicy="no-referrer"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-safari-900/80 via-transparent to-transparent opacity-60" />
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <p className="text-white font-bold text-lg leading-tight">{safari.trip_title}</p>
+                    <div className="absolute bottom-4 left-4 right-6">
+                      <p className="text-white font-extrabold text-xl md:text-2xl leading-tight tracking-tight line-clamp-2">{safari.trip_title}</p>
                     </div>
                   </div>
                   <div className="p-6 space-y-4">

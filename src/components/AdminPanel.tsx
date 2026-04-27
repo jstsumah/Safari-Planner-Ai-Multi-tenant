@@ -214,8 +214,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   
   // Navigation State
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const [tabHistory, setTabHistory] = useState<AdminTab[]>(['dashboard']);
   const [navigationSource, setNavigationSource] = useState<AdminTab>('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  const navigateToTab = useCallback((tab: AdminTab) => {
+    setActiveTab(tab);
+    setTabHistory(prev => {
+      // Don't push duplicate consecutive tabs
+      if (prev[prev.length - 1] === tab) return prev;
+      return [...prev, tab];
+    });
+  }, []);
+
+  const goBack = useCallback(() => {
+    setTabHistory(prev => {
+      if (prev.length <= 1) {
+        setActiveTab('dashboard');
+        return ['dashboard'];
+      }
+      const newHistory = [...prev];
+      newHistory.pop(); // Remove current tab
+      const previousTab = newHistory[newHistory.length - 1];
+      setActiveTab(previousTab);
+      return newHistory;
+    });
+  }, []);
 
   // Global Loading State
   const [isLoading, setIsLoading] = useState(false);
@@ -841,7 +865,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const handleCostingClick = (lead: any) => {
     setNavigationSource(activeTab);
     setSelectedLead(lead);
-    setActiveTab('costing');
+    navigateToTab('costing');
   };
 
   const handleInvoiceClick = async (quote: any) => {
@@ -880,32 +904,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     }
     setNavigationSource(activeTab);
     setSelectedLead(currentQuote);
-    setActiveTab('invoice_editor');
+    navigateToTab('invoice_editor');
   };
 
   const handleEditLodge = (lodge: Lodge) => {
     setSelectedLodge(lodge);
-    setActiveTab('property_edit');
+    navigateToTab('property_edit');
   };
 
   const handleNewLodge = () => {
     setSelectedLodge(null);
-    setActiveTab('property_edit');
+    navigateToTab('property_edit');
   };
 
   const handleEditMaster = (safari: any) => {
     setSelectedMaster(safari);
-    setActiveTab('safari_edit');
+    navigateToTab('safari_edit');
   };
 
   const handleNewMaster = () => {
     setSelectedMaster(null);
-    setActiveTab('safari_edit');
+    navigateToTab('safari_edit');
   };
 
   const handleViewLodgeDetails = (lodge: Lodge) => {
     setSelectedLodge(lodge);
-    setActiveTab('property_view');
+    navigateToTab('property_view');
   };
 
   const handleDeleteLodge = async (id: string) => {
@@ -953,7 +977,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       id: safari.id,
       type: 'master'
     });
-    setActiveTab('itinerary_view');
+    navigateToTab('itinerary_view');
   };
 
   const handleViewLead = (lead: any) => {
@@ -965,7 +989,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       id: lead.id,
       type: 'lead'
     });
-    setActiveTab('itinerary_view');
+    navigateToTab('itinerary_view');
   };
 
   const handleSaveCosting = async (report: CostingReport, closeAfter = true) => {
@@ -977,7 +1001,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       if (error) throw error;
       if (closeAfter) {
         toast.success("Quotation saved successfully.");
-        setActiveTab(navigationSource);
+        goBack();
       } else { 
         fetchQuotations(); 
         toast.success("Quotation updated.");
@@ -1103,11 +1127,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
         <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <NavItem icon={<Home size={22} />} label="Home" isActive={false} collapsed={isSidebarCollapsed} onClick={onClose} />
-          <NavItem icon={<LayoutDashboard size={22} />} label="Dashboard" isActive={activeTab === 'dashboard'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('dashboard')} />
-          <NavItem icon={<Building size={22} />} label="Properties" isActive={activeTab === 'properties' || activeTab === 'property_edit' || activeTab === 'property_view'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('properties')} />
-          <NavItem icon={<Bookmark size={22} />} label="Signature Safaris" isActive={activeTab === 'signature_safaris' || activeTab === 'safari_edit'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('signature_safaris')} />
-          <NavItem icon={<Users size={22} />} label="Team" isActive={activeTab === 'team'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('team')} />
-          <NavItem icon={<MessageSquare size={22} />} label="Booking Leads" isActive={activeTab === 'leads'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('leads')} />
+          <NavItem icon={<LayoutDashboard size={22} />} label="Dashboard" isActive={activeTab === 'dashboard'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('dashboard')} />
+          <NavItem icon={<Building size={22} />} label="Properties" isActive={activeTab === 'properties' || activeTab === 'property_edit' || activeTab === 'property_view'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('properties')} />
+          <NavItem icon={<Bookmark size={22} />} label="Signature Safaris" isActive={activeTab === 'signature_safaris' || activeTab === 'safari_edit'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('signature_safaris')} />
+          <NavItem icon={<Users size={22} />} label="Team" isActive={activeTab === 'team'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('team')} />
+          <NavItem icon={<MessageSquare size={22} />} label="Booking Leads" isActive={activeTab === 'leads'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('leads')} />
           
           {/* Financial Management Group */}
           <div className="space-y-1">
@@ -1130,17 +1154,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             
             {(isFinancialsOpen || isSidebarCollapsed) && (
               <div className={`${!isSidebarCollapsed ? 'ml-4 pl-4 border-l border-safari-800' : ''} space-y-1 mt-1`}>
-                <NavItem icon={<ReceiptText size={18} />} label="Quotations" isActive={activeTab === 'quotations'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('quotations')} />
-                <NavItem icon={<FileText size={18} />} label="Invoices" isActive={activeTab === 'invoices' || activeTab === 'invoice_editor'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('invoices')} />
-                <NavItem icon={<CreditCard size={18} />} label="Payments" isActive={activeTab === 'payments'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('payments')} />
-                <NavItem icon={<FileCheck size={18} />} label="Receipts" isActive={activeTab === 'receipts'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('receipts')} />
-                <NavItem icon={<FileText size={18} />} label="Payment Vouchers" isActive={activeTab === 'payment_vouchers'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('payment_vouchers')} />
-                <NavItem icon={<Wallet size={18} />} label="Supplier Vouchers" isActive={activeTab === 'disbursements'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('disbursements')} />
+                <NavItem icon={<ReceiptText size={18} />} label="Quotations" isActive={activeTab === 'quotations'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('quotations')} />
+                <NavItem icon={<FileText size={18} />} label="Invoices" isActive={activeTab === 'invoices' || activeTab === 'invoice_editor'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('invoices')} />
+                <NavItem icon={<CreditCard size={18} />} label="Payments" isActive={activeTab === 'payments'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('payments')} />
+                <NavItem icon={<FileCheck size={18} />} label="Receipts" isActive={activeTab === 'receipts'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('receipts')} />
+                <NavItem icon={<FileText size={18} />} label="Payment Vouchers" isActive={activeTab === 'payment_vouchers'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('payment_vouchers')} />
+                <NavItem icon={<Wallet size={18} />} label="Supplier Vouchers" isActive={activeTab === 'disbursements'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('disbursements')} />
               </div>
             )}
           </div>
 
-          <NavItem icon={<Wand2 size={22} />} label="Quick Costing" isActive={activeTab === 'calculator'} collapsed={isSidebarCollapsed} onClick={() => setActiveTab('calculator')} />
+          <NavItem icon={<Wand2 size={22} />} label="Quick Costing" isActive={activeTab === 'calculator'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('calculator')} />
           
           {profile?.is_super_user && (
             <div className="pt-4 mt-4 border-t border-safari-800">
@@ -1150,7 +1174,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 label="Super Hub" 
                 isActive={activeTab === 'super_hub'} 
                 collapsed={isSidebarCollapsed} 
-                onClick={() => setActiveTab('super_hub')} 
+                onClick={() => navigateToTab('super_hub')} 
               />
             </div>
           )}
@@ -1165,7 +1189,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
           <Tooltip content="Configuration Settings">
             <button 
-              onClick={() => setActiveTab('settings')} 
+              onClick={() => navigateToTab('settings')} 
               className={`transition-colors ${activeTab === 'settings' ? 'text-white' : 'text-safari-400 hover:text-white'}`}
             >
               <SettingsIcon size={20} />
@@ -1243,7 +1267,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             }}
             onEditLodge={(lodge: Lodge) => {
               setSelectedLodge(lodge);
-              setActiveTab('property_edit');
+              navigateToTab('property_edit');
             }}
             onDeleteCompany={async (id: string) => {
               console.log("AdminPanel: onDeleteCompany called for ID:", id);
@@ -1296,7 +1320,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             }}
             onAddProperty={() => {
               setSelectedLodge(null);
-              setActiveTab('property_edit');
+              navigateToTab('property_edit');
             }}
             globalBranding={globalBranding}
             onAddPartner={() => setIsAddPartnerOpen(true)}
@@ -2393,19 +2417,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           />
         )}
         {activeTab === 'invoices' && <InvoicesView invoices={allBilledQuotes} isLoading={isQuotesLoading} onInvoice={handleInvoiceClick} quotations={quotations} onToggleConfirm={handleToggleConfirmation} />}
-        {activeTab === 'payments' && <div className="p-8"><PaymentModule pendingInvoices={allBilledQuotes} payments={payments} onRecordPayment={handleRecordPayment} onBack={() => setActiveTab('dashboard')} /></div>}
-        {activeTab === 'receipts' && <div className="p-8"><ReceiptModule payments={payments} branding={branding} onBack={() => setActiveTab('dashboard')} /></div>}
-        {activeTab === 'payment_vouchers' && <div className="p-8"><PaymentVoucherModule payments={payments} branding={branding} onBack={() => setActiveTab('dashboard')} /></div>}
+        {activeTab === 'payments' && <div className="p-8"><PaymentModule pendingInvoices={allBilledQuotes} payments={payments} onRecordPayment={handleRecordPayment} onBack={goBack} /></div>}
+        {activeTab === 'receipts' && <div className="p-8"><ReceiptModule payments={payments} branding={branding} onBack={goBack} /></div>}
+        {activeTab === 'payment_vouchers' && <div className="p-8"><PaymentVoucherModule payments={payments} branding={branding} onBack={goBack} /></div>}
         {/* Fixed confirmedQuotes error by using allBilledQuotes */}
-        {activeTab === 'disbursements' && <div className="p-8"><DisbursementModule itineraries={allBilledQuotes} branding={branding} onBack={() => setActiveTab('dashboard')} /></div>}
-        {activeTab === 'calculator' && <div className="p-8"><CostingModule itinerary={DUMMY_ITINERARY} formData={DUMMY_FORM_DATA} lodges={lodges} customRates={customRates} branding={branding} onBack={() => setActiveTab('dashboard')} initialMode="calculator" /></div>}
+        {activeTab === 'disbursements' && <div className="p-8"><DisbursementModule itineraries={allBilledQuotes} branding={branding} onBack={goBack} /></div>}
+        {activeTab === 'calculator' && <div className="p-8"><CostingModule itinerary={DUMMY_ITINERARY} formData={DUMMY_FORM_DATA} lodges={lodges} customRates={customRates} branding={branding} onBack={goBack} initialMode="calculator" /></div>}
         {activeTab === 'property_edit' && (
           <div className="p-8">
             <LodgeEditor 
               lodge={selectedLodge} 
               customRate={selectedLodge ? customRates.find(r => r.lodge_id === selectedLodge.id) : null}
               companies={companies}
-              onClose={() => setActiveTab('properties')} 
+              onClose={goBack} 
               onSave={() => {
                 fetchLodges();
                 fetchCustomRates();
@@ -2413,13 +2437,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             />
           </div>
         )}
-        {activeTab === 'safari_edit' && <div className="p-8"><MasterItineraryEditor safari={selectedMaster} lodges={lodges} teamMembers={teamMembers} onClose={() => setActiveTab('signature_safaris')} onSave={fetchMasterItineraries} /></div>}
+        {activeTab === 'safari_edit' && <div className="p-8"><MasterItineraryEditor safari={selectedMaster} lodges={lodges} teamMembers={teamMembers} onClose={goBack} onSave={fetchMasterItineraries} /></div>}
         {activeTab === 'property_view' && selectedLodge && (
           <div className="p-8">
             <PropertyDetailView 
               lodge={selectedLodge} 
               customRate={customRates.find(r => r.lodge_id === selectedLodge.id)}
-              onBack={() => setActiveTab('properties')} 
+              onBack={goBack} 
             />
           </div>
         )}
@@ -2431,7 +2455,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               lodges={lodges} 
               customRates={customRates}
               branding={branding}
-              onBack={() => setActiveTab(navigationSource)} 
+              onBack={goBack} 
               onSave={handleSaveCosting}
               backLabel={getBackLabel(navigationSource)}
             />
@@ -2445,7 +2469,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               itinerary={selectedLead.itinerary_data} 
               payments={payments.filter(p => p.itineraryId === selectedLead.id)}
               branding={branding}
-              onBack={() => setActiveTab(navigationSource)} 
+              onBack={goBack} 
             />
           </div>
         )}
@@ -2456,18 +2480,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               formData={viewingItinerary.formData} 
               lodges={lodges} 
               branding={branding}
-              onReset={() => setActiveTab(navigationSource)} 
+              onReset={goBack} 
               onEdit={() => {
                 if (viewingItinerary.type === 'master') {
-                  setActiveTab('safari_edit');
+                  navigateToTab('safari_edit');
                 } else if (viewingItinerary.type === 'lead') {
-                  setActiveTab('costing');
+                  navigateToTab('costing');
                 } else {
-                  setActiveTab(navigationSource);
+                  goBack();
                 }
               }} 
               onViewLodge={handleViewLodgeDetails}
-              onBackToHistory={() => setActiveTab(navigationSource)}
+              onBackToHistory={goBack}
               isFromAdmin={true}
               masterId={viewingItinerary.type === 'master' ? viewingItinerary.id : undefined}
               itinId={viewingItinerary.type === 'lead' ? viewingItinerary.id : undefined}

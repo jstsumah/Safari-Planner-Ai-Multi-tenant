@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Lodge, PropertyType, BudgetTier, Season, UnitCategory, SeasonalRate } from '../types';
 import { 
@@ -57,7 +57,6 @@ const DEFAULT_LODGE: Partial<Lodge> = {
 const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies = [], onClose, onSave }) => {
   const { company, profile } = useAuth();
   const isSuperUser = profile?.is_super_user;
-  const isOwner = isSuperUser || !lodge || lodge.company_id === company?.id;
   
   const [formData, setFormData] = useState<Lodge>(() => {
     if (lodge) {
@@ -68,8 +67,22 @@ const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies 
       }
       return data;
     }
-    return JSON.parse(JSON.stringify(DEFAULT_LODGE));
+    const defaultData = JSON.parse(JSON.stringify(DEFAULT_LODGE));
+    // Auto-assign company if not super user and adding new lodge
+    if (!isSuperUser && company) {
+      defaultData.company_id = company.id;
+    }
+    return defaultData;
   });
+
+  useEffect(() => {
+    // If user is not super admin, ensure company_id is always their own company
+    if (!isSuperUser && company && formData.company_id !== company.id) {
+      setFormData(prev => ({ ...prev, company_id: company.id }));
+    }
+  }, [company, isSuperUser, formData.company_id]);
+
+  const isOwner = isSuperUser || !lodge || lodge.company_id === company?.id;
   
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);

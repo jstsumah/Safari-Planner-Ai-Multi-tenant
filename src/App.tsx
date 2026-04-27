@@ -201,6 +201,36 @@ const App: React.FC = () => {
     return 'landing';
   });
 
+  const [viewHistory, setViewHistory] = useState<string[]>(['landing']);
+
+  useEffect(() => {
+    // Keep history in sync on mount
+    setViewHistory([viewMode]);
+  }, []);
+
+  const navigateToView = (view: typeof viewMode) => {
+    setViewMode(view);
+    setViewHistory(prev => {
+      // Don't push duplicate consecutive views
+      if (prev[prev.length - 1] === view) return prev;
+      return [...prev, view];
+    });
+  };
+
+  const goBackView = () => {
+    setViewHistory(prev => {
+      if (prev.length <= 1) {
+        setViewMode('landing');
+        return ['landing'];
+      }
+      const newHistory = [...prev];
+      newHistory.pop(); // Remove current view
+      const previousView = newHistory[newHistory.length - 1];
+      setViewMode(previousView as any);
+      return newHistory;
+    });
+  };
+
   const [authMode, setAuthMode] = useState<'signup' | 'signin'>('signup');
   const [authType, setAuthType] = useState<'agency' | 'user'>('agency');
 
@@ -550,18 +580,18 @@ const App: React.FC = () => {
   }
 
   if (!user && !isPublicView) {
-    return <Onboarding onComplete={(type) => setViewMode(type === 'user' ? 'history' : 'admin')} />;
+    return <Onboarding onComplete={(type) => navigateToView(type === 'user' ? 'history' : 'admin')} />;
   }
 
   if (user && !company && !isPublicView && !authLoading) {
     // If no profile exists, they need to complete onboarding
     if (!profile) {
-      return <Onboarding onComplete={(type) => setViewMode(type === 'user' ? 'history' : 'admin')} />;
+      return <Onboarding onComplete={(type) => navigateToView(type === 'user' ? 'history' : 'admin')} />;
     }
     
     // If they have a profile, only non-travelers (agencies/providers) require a company
     if (profile.user_type !== 'user') {
-      return <Onboarding onComplete={(type) => setViewMode(type === 'user' ? 'history' : 'admin')} />;
+      return <Onboarding onComplete={(type) => navigateToView(type === 'user' ? 'history' : 'admin')} />;
     }
   }
 
@@ -570,12 +600,12 @@ const App: React.FC = () => {
       <Onboarding 
         initialMode={authMode} 
         userType={authType} 
-        onBack={() => setViewMode('landing')} 
+        onBack={goBackView} 
         onComplete={(type) => {
           if (type === 'user') {
-            setViewMode('history');
+            navigateToView('history');
           } else {
-            setViewMode('admin');
+            navigateToView('admin');
           }
         }}
       />
@@ -588,27 +618,27 @@ const App: React.FC = () => {
         <LandingPage 
           branding={systemBranding}
           onViewProfile={() => setIsProfileOpen(true)}
-          onViewPartners={() => setViewMode('partners')}
+          onViewPartners={() => navigateToView('partners')}
           onStart={() => {
             if (user && profile) {
               const userType = user.user_metadata?.user_type || (profile.company_id ? 'agency' : 'user');
-              setViewMode(userType === 'user' ? 'history' : 'admin');
+              navigateToView(userType === 'user' ? 'history' : 'admin');
             } else {
-              setViewMode('form');
+              navigateToView('form');
             }
           }} 
           onAuth={() => {
             if (user && profile) {
               const userType = user.user_metadata?.user_type || (profile.company_id ? 'agency' : 'user');
-              setViewMode(userType === 'user' ? 'history' : 'admin');
+              navigateToView(userType === 'user' ? 'history' : 'admin');
             } else {
               setAuthMode('signin');
               setAuthType('user');
-              setViewMode('auth');
+              navigateToView('auth');
             }
           }}
-          onAdmin={() => setViewMode('admin')} 
-          onCalculator={() => setViewMode('calculator')}
+          onAdmin={() => navigateToView('admin')} 
+          onCalculator={() => navigateToView('calculator')}
           masterItineraries={masterItineraries}
           isAuthenticated={!!user}
         />
@@ -619,7 +649,7 @@ const App: React.FC = () => {
       return (
         <PartnersPage 
           branding={branding}
-          onBack={() => setViewMode('landing')}
+          onBack={goBackView}
           onViewProfile={(companyId) => {
             setSelectedCompanyId(companyId);
             setIsProfileOpen(true);
@@ -705,7 +735,7 @@ const App: React.FC = () => {
                         onClick={() => {
                           setAuthMode('signin');
                           setAuthType('user');
-                          setViewMode('auth');
+                          navigateToView('auth');
                         }}
                         className="text-sm font-bold text-safari-600 hover:text-safari-900 px-4 py-2 hover:bg-safari-50 rounded-lg transition-all"
                       >
@@ -721,7 +751,7 @@ const App: React.FC = () => {
                         {profile?.user_type !== 'user' && (
                           <Tooltip content="Access the Partner Dashboard">
                             <button 
-                              onClick={() => setViewMode('admin')}
+                              onClick={() => navigateToView('admin')}
                               className="text-safari-400 hover:text-safari-600 transition-colors p-2 rounded-full hover:bg-safari-50"
                               title="Partner Dashboard"
                             >
@@ -771,7 +801,7 @@ const App: React.FC = () => {
               }}
               onView={handleLoadPastItinerary} 
               onEdit={handleEdit} 
-              onBack={() => setViewMode('form')}
+              onBack={goBackView}
             />
           ) : viewMode === 'form' ? (
             <div className="space-y-8">
@@ -817,11 +847,11 @@ const App: React.FC = () => {
               onReset={handleReset} 
               onEdit={() => handleEdit(formData)} 
               onViewLodge={handleViewLodge}
-              onBackToHistory={isFromHistory ? () => setViewMode('history') : (isFromAdmin ? () => setViewMode('admin') : undefined)}
+              onBackToHistory={goBackView}
               onAuthNeeded={(mode, type) => {
                 setAuthMode(mode);
                 setAuthType(type);
-                setViewMode('auth');
+                navigateToView('auth');
               }}
               isFromAdmin={isFromAdmin}
               isSharedView={isSharedView}
