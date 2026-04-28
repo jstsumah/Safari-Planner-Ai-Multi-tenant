@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   Plus, Trash2, Save, Building, Building2, LogOut, Loader2, 
   Edit3, Home,
@@ -9,7 +9,7 @@ import {
   Calculator, Bookmark, FileCheck, Wand2,
   Wallet, Settings as SettingsIcon, Palette,
   Share2, Check, Users, UserPlus, Type, Image as ImageIcon, HelpCircle, Quote, Database,
-  ShieldAlert, ShieldCheck, Upload, TrendingUp, ArrowUpRight, BarChart3, Activity, Clock
+  ShieldAlert, ShieldCheck, Upload, TrendingUp, ArrowUpRight, BarChart3, Activity, Clock, ArrowLeft
 } from 'lucide-react';
 import { 
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
@@ -219,33 +219,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   
   // Navigation State
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const [managedCompanyId, setManagedCompanyId] = useState<string | null>(null);
+
   const [tabHistory, setTabHistory] = useState<AdminTab[]>(['dashboard']);
   const [navigationSource, setNavigationSource] = useState<AdminTab>('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
-  const navigateToTab = useCallback((tab: AdminTab) => {
-    setActiveTab(tab);
-    setTabHistory(prev => {
-      // Don't push duplicate consecutive tabs
-      if (prev[prev.length - 1] === tab) return prev;
-      return [...prev, tab];
-    });
-  }, []);
-
-  const goBack = useCallback(() => {
-    setTabHistory(prev => {
-      if (prev.length <= 1) {
-        setActiveTab('dashboard');
-        return ['dashboard'];
-      }
-      const newHistory = [...prev];
-      newHistory.pop(); // Remove current tab
-      const previousTab = newHistory[newHistory.length - 1];
-      setActiveTab(previousTab);
-      return newHistory;
-    });
-  }, []);
-
+  
   // Global Loading State
   const [isLoading, setIsLoading] = useState(false);
 
@@ -270,6 +249,43 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [customRates, setCustomRates] = useState<LodgeCustomRate[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [allProfiles, setAllProfiles] = useState<any[]>([]);
+
+  // Derived Management Context State
+  const managedCompany = useMemo(() => {
+    if (!managedCompanyId) return null;
+    return companies.find((c: any) => c.id === managedCompanyId);
+  }, [managedCompanyId, companies]);
+
+  const effectiveCompany = useMemo(() => {
+    if (profile?.is_super_user && managedCompany) return managedCompany;
+    return company;
+  }, [profile, managedCompany, company]);
+
+  const effectiveCompanyId = effectiveCompany?.id;
+
+  const navigateToTab = useCallback((tab: AdminTab) => {
+    setActiveTab(tab);
+    setTabHistory(prev => {
+      // Don't push duplicate consecutive tabs
+      if (prev[prev.length - 1] === tab) return prev;
+      return [...prev, tab];
+    });
+  }, []);
+
+  const goBack = useCallback(() => {
+    setTabHistory(prev => {
+      if (prev.length <= 1) {
+        setActiveTab('dashboard');
+        return ['dashboard'];
+      }
+      const newHistory = [...prev];
+      newHistory.pop(); // Remove current tab
+      const previousTab = newHistory[newHistory.length - 1];
+      setActiveTab(previousTab);
+      return newHistory;
+    });
+  }, []);
+
   const [isLodgesLoading, setIsLodgesLoading] = useState(false);
   const [selectedLodge, setSelectedLodge] = useState<Lodge | null>(null);
   const [selectedMaster, setSelectedMaster] = useState<any | null>(null);
@@ -329,95 +345,116 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   });
 
   const fetchLodges = useCallback(async () => {
-    if (!company && !profile?.is_super_user) return;
+    if (!effectiveCompany && !profile?.is_super_user) return;
     setIsLodgesLoading(true);
+    let query = supabase.from('lodges').select('*');
+    if (effectiveCompanyId) {
+      query = query.eq('company_id', effectiveCompanyId);
+    }
     try {
-      const { data, error } = await supabase.from('lodges')
-        .select('*')
+      const { data, error } = await query
         .order('created_at', { ascending: false });
       if (error) throw error;
       setLodges(data || []);
     } catch (err: any) { console.error(err); } finally { setIsLodgesLoading(false); }
-  }, [company, profile]);
+  }, [effectiveCompany, profile, managedCompanyId]);
 
   const fetchGlobalData = useCallback(async () => {
     if (!profile?.is_super_user) return;
     try {
       const { data: cos, error: ce } = await supabase.from('companies').select('*').order('name');
       if (ce) throw ce;
-      setCompanies(cos || []);
+      setCompanies(prev => JSON.stringify(prev) === JSON.stringify(cos || []) ? prev : (cos || []));
 
       const { data: pros, error: pe } = await supabase.from('profiles').select('*').order('full_name');
       if (pe) throw pe;
-      setAllProfiles(pros || []);
+      setAllProfiles(prev => JSON.stringify(prev) === JSON.stringify(pros || []) ? prev : (pros || []));
     } catch (err: any) {
       console.error("Global fetch error:", err);
     }
   }, [profile]);
 
   const fetchCustomRates = useCallback(async () => {
-    if (!company) return;
+    if (!effectiveCompanyId) return;
     try {
       const { data, error } = await supabase.from('lodge_custom_rates')
         .select('*')
-        .eq('company_id', company.id);
+        .eq('company_id', effectiveCompanyId);
       if (error) throw error;
       setCustomRates(data || []);
     } catch (err: any) { console.error(err); }
-  }, [company]);
+  }, [effectiveCompanyId]);
 
   const fetchMasterItineraries = useCallback(async () => {
-    if (!company && !profile?.is_super_user) return;
+    if (!effectiveCompanyId && !profile?.is_super_user) return;
     setIsMasterLoading(true);
     try {
       let query = supabase.from('master_itineraries').select('*');
-      if (!profile?.is_super_user && company) {
-        query = query.eq('company_id', company.id);
+      if (effectiveCompanyId) {
+        query = query.eq('company_id', effectiveCompanyId);
+      } else if (profile?.is_super_user && !managedCompanyId) {
+        // Global master itineraries (created by system/null) 
+        query = query.is('company_id', null);
       }
       const { data, error } = await query.order('created_at', { ascending: false });
       if (error) throw error;
       setMasterItineraries(data || []);
     } catch (err: any) { console.error(err); } finally { setIsMasterLoading(false); }
-  }, [company, profile]);
+  }, [effectiveCompanyId, profile, managedCompanyId]);
 
   const fetchLeads = useCallback(async () => {
-    if (!company && !profile?.is_super_user) return;
+    if (!effectiveCompanyId && !profile?.is_super_user) return;
     setIsLeadsLoading(true);
     try {
       let query = supabase.from('itineraries').select('*');
-      if (!profile?.is_super_user && company) {
-        query = query.eq('company_id', company.id);
+      
+      if (profile?.is_super_user && !managedCompanyId) {
+        // Super user sees ALL leads across the network when no specific company is selected
+        // We don't filter by company_id here to give a full overview
+      } else if (effectiveCompanyId) {
+        // Partners see leads for their company
+        // If we want to support assignment in the future, we need to add assigned_company_id column
+        // For now, we pull leads where company_id is the effective company
+        query = query.eq('company_id', effectiveCompanyId);
       }
+
       const { data, error } = await query
         .is('costing_report', null)
         .order('created_at', { ascending: false });
+      
       if (error) throw error;
       setLeads(data || []);
-    } catch (err: any) { console.error(err); } finally { setIsLeadsLoading(false); }
-  }, [company, profile]);
+    } catch (err: any) { 
+      console.error("fetchLeads error:", err); 
+    } finally { 
+      setIsLeadsLoading(false); 
+    }
+  }, [effectiveCompanyId, profile, managedCompanyId]);
 
   const fetchQuotations = useCallback(async () => {
-    if (!company && !profile?.is_super_user) return;
+    if (!effectiveCompanyId && !profile?.is_super_user) return;
     setIsQuotesLoading(true);
     try {
       let query = supabase.from('itineraries').select('*');
-      if (!profile?.is_super_user && company) {
-        query = query.eq('company_id', company.id);
-      }
+      if (effectiveCompanyId) {
+        query = query.eq('company_id', effectiveCompanyId);
+      } 
+      // If super user and no managedCompanyId, we don't add an .eq filter, effectively fetching all records
+      
       const { data, error } = await query
         .not('costing_report', 'is', null)
         .order('updated_at', { ascending: false });
       if (error) throw error;
       setQuotations(data || []);
     } catch (err: any) { console.error(err); } finally { setIsQuotesLoading(false); }
-  }, [company, profile]);
+  }, [effectiveCompanyId, profile, managedCompanyId]);
 
   const fetchPayments = useCallback(async () => {
-    if (!company && !profile?.is_super_user) return;
+    if (!effectiveCompanyId && !profile?.is_super_user) return;
     try {
       let query = supabase.from('payments').select('*');
-      if (!profile?.is_super_user && company) {
-        query = query.eq('company_id', company.id);
+      if (effectiveCompanyId) {
+        query = query.eq('company_id', effectiveCompanyId);
       }
       const { data, error } = await query.order('date', { ascending: false });
       
@@ -439,15 +476,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     } catch (err: any) {
       console.error("Failed to fetch payments:", err);
     }
-  }, [company, profile]);
+  }, [effectiveCompanyId, profile, managedCompanyId]);
 
   const fetchTeamMembers = useCallback(async () => {
-    if (!company && !profile?.is_super_user) return;
+    if (!effectiveCompanyId && !profile?.is_super_user) return;
     setIsTeamLoading(true);
     try {
       let query = supabase.from('team_members').select('*');
-      if (!profile?.is_super_user && company) {
-        query = query.eq('company_id', company.id);
+      if (effectiveCompanyId) {
+        query = query.eq('company_id', effectiveCompanyId);
       }
       const { data, error } = await query
         .order('created_at', { ascending: false });
@@ -460,11 +497,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       }
       setTeamMembers(data || []);
     } catch (err: any) { console.error(err); } finally { setIsTeamLoading(false); }
-  }, [company, profile]);
+  }, [effectiveCompanyId, profile, managedCompanyId]);
 
   const fetchConfig = useCallback(async () => {
-    if (company && company.branding) {
-      setBranding(company.branding);
+    if (effectiveCompany && effectiveCompany.branding) {
+      setBranding(effectiveCompany.branding);
     }
     
     // Always fetch global branding for super admin management
@@ -482,7 +519,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       console.warn("Global system branding not found, using defaults.");
       setGlobalBranding(DEFAULT_BRANDING);
     }
-  }, [company]);
+  }, [effectiveCompany]);
 
   const fetchAllData = useCallback(() => {
     fetchLodges();
@@ -504,7 +541,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       }, 0);
       return () => clearTimeout(timeoutId);
     }
-  }, [company, profile?.is_super_user, fetchAllData]);
+  }, [company, profile?.is_super_user, fetchAllData, managedCompanyId]);
 
   // 1. Live preview effect for branding changes
   useEffect(() => {
@@ -595,7 +632,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         if (error) throw error;
         toast.success("Global landing page configuration updated.");
       } else {
-        if (!company) return;
+        const targetId = effectiveCompanyId;
+        if (!targetId) return;
         const updatePayload: any = {
            branding: targetBranding,
            updated_at: new Date().toISOString()
@@ -606,10 +644,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         const { error } = await supabase
           .from('companies')
           .update(updatePayload)
-          .eq('id', company.id);
+          .eq('id', targetId);
         
         if (error) throw error;
-        toast.success("Agency branding updated.");
+        toast.success(managedCompanyId ? `Settings updated for ${managedCompany?.name}` : "Agency branding updated.");
       }
 
       await refreshProfile();
@@ -641,6 +679,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         setBranding({ ...branding, heroImage: result });
       }
       toast.success("Image uploaded. Remember to save configuration changes.");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("File is too large. Maximum size is 2MB for optimized storage.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setBranding({ ...branding, agencyLogo: result });
+      toast.success("Logo uploaded. Remember to save changes.");
     };
     reader.readAsDataURL(file);
   };
@@ -1192,6 +1248,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           </div>
 
           <NavItem icon={<Wand2 size={22} />} label="Quick Costing" isActive={activeTab === 'calculator'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('calculator')} />
+          <NavItem icon={<Compass size={22} />} label="Quick Planner" isActive={false} collapsed={isSidebarCollapsed} onClick={() => window.open('/', '_blank')} />
           
           {profile?.is_super_user && (
             <div className="pt-4 mt-4 border-t border-safari-800">
@@ -1248,17 +1305,79 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         </div>
 
         <main className="flex-1 lg:overflow-y-auto bg-gray-50 pt-16 lg:pt-0 pb-32 lg:pb-0 overflow-x-hidden overflow-y-auto">
+          {profile?.is_super_user && (
+            <div className="sticky top-0 z-[100] px-4 py-3 bg-white/80 backdrop-blur-md border-b border-safari-100 shadow-sm animate-fadeIn">
+              <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="p-2 bg-purple-50 rounded-xl">
+                    <Building2 className="text-purple-600" size={20} />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative">
+                      <select 
+                        className="appearance-none bg-safari-50 border border-safari-100 rounded-lg px-4 py-2 pr-10 font-bold text-xs text-safari-900 focus:ring-2 focus:ring-purple-200 transition-all cursor-pointer min-w-[240px]"
+                        value={managedCompanyId || ''}
+                        onChange={(e) => setManagedCompanyId(e.target.value || null)}
+                      >
+                        <option value="">Full Platform Overview</option>
+                        {companies.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-safari-400">
+                        <ChevronDown size={14} />
+                      </div>
+                    </div>
+                    {managedCompanyId && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-[9px] font-black uppercase tracking-widest border border-green-100 animate-fadeIn">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                        Viewing: {managedCompany?.name}
+                        <button 
+                          onClick={() => setManagedCompanyId(null)}
+                          className="ml-1 hover:text-green-900 transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-safari-400 mr-2">Admin Tools:</span>
+                  {activeTab === 'super_hub' ? (
+                    <button 
+                       onClick={() => navigateToTab('dashboard')}
+                       className="px-4 py-2 bg-safari-100 text-safari-900 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-safari-200 transition-all flex items-center gap-1.5"
+                    >
+                      <ArrowLeft size={12} /> Back to Dashboard
+                    </button>
+                  ) : (
+                    <button 
+                       onClick={() => navigateToTab('super_hub')}
+                       className="px-4 py-2 bg-safari-900 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-safari-800 transition-all flex items-center gap-1.5"
+                    >
+                      Super Hub <ShieldCheck size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
         {activeTab === 'dashboard' && (
           <div className="p-4 lg:p-8 space-y-8 animate-fadeIn max-w-[1600px] mx-auto">
+
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
               <div>
                 <h1 className="text-4xl font-black text-safari-900 tracking-tight">
-                  {profile?.is_super_user ? 'Network at a Glance' : 'Welcome Back'}
+                  {(profile?.is_super_user && !managedCompanyId) ? 'Network at a Glance' : `${effectiveCompany?.name || 'Dashboard'}`}
                 </h1>
                 <p className="text-safari-500 font-bold text-lg mt-1">
-                  {profile?.is_super_user 
+                  {(profile?.is_super_user && !managedCompanyId) 
                     ? 'See what is happening across your entire safari network today.' 
-                    : 'Here is an update on your projects and recent activity.'}
+                    : managedCompanyId 
+                      ? `Managing ${managedCompany?.name}. Viewing records as an administrator.` 
+                      : 'Here is an update on your projects and recent activity.'}
                 </p>
               </div>
               <div className="flex items-center gap-3 bg-white p-1.5 rounded-2xl border border-safari-100 shadow-sm">
@@ -1270,10 +1389,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 </button>
                 <div className="h-8 w-px bg-safari-100" />
                 <div className="px-4">
-                  <p className="text-[10px] font-black uppercase text-safari-400 tracking-widest">System Status</p>
+                  <p className="text-[10px] font-black uppercase text-safari-400 tracking-widest">
+                    {managedCompanyId ? 'Company Status' : 'System Status'}
+                  </p>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                    <span className="text-xs font-black uppercase tracking-tight text-safari-900">Live</span>
+                    <span className="text-xs font-black uppercase tracking-tight text-safari-900">
+                      {managedCompanyId ? (managedCompany?.status || 'Active') : 'Live'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1282,17 +1405,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             {/* Core Metrics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <SummaryCard 
-                title={profile?.is_super_user ? "Properties" : "Our Collection"} 
-                value={String(profile?.is_super_user ? lodges.length : lodges.filter(l => l.company_id === company?.id).length)} 
+                title={(profile?.is_super_user && !managedCompanyId) ? "Properties" : "Our Collection"} 
+                value={String((profile?.is_super_user && !managedCompanyId) ? lodges.length : lodges.filter(l => l.company_id === effectiveCompanyId).length)} 
                 subtitle="Lodges & Camps Ready"
                 icon={<Building2 className="text-safari-600" />}
                 trend="+2 new"
                 positive={true}
               />
               <SummaryCard 
-                title={profile?.is_super_user ? "Future Travelers" : "New Inquiries"} 
+                title={(profile?.is_super_user && !managedCompanyId) ? "Future Travelers" : "New Inquiries"} 
                 value={String(leads.length)} 
-                subtitle={profile?.is_super_user ? "Active Opportunities" : "People Reaching Out"} 
+                subtitle={(profile?.is_super_user && !managedCompanyId) ? "Active Opportunities" : "People Reaching Out"} 
                 icon={<Activity className="text-blue-600" />}
                 trend="Growing"
                 positive={true}
@@ -1598,6 +1721,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 fetchGlobalData();
               } catch (err: any) { toast.error(err.message); }
             }}
+            onUpdateCompanyScore={async (id: string, proficiencyScore: number) => {
+              try {
+                const { error } = await supabase.from('companies').update({ proficiencyScore }).eq('id', id);
+                if (error) throw error;
+                toast.success(`Proficiency score updated.`);
+                fetchGlobalData();
+              } catch (err: any) { toast.error(err.message); }
+            }}
             onDeleteUser={async (id: string) => {
               if (!confirm("Reconfirm: Delete this user profile?")) return;
               try {
@@ -1641,8 +1772,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           <div className="p-8 max-w-7xl mx-auto space-y-8 animate-fadeIn">
             <header className="flex justify-between items-end">
               <div>
-                <h1 className="text-3xl font-bold text-safari-900">Property Ecosystem</h1>
-                <p className="text-safari-500 font-medium">Manage your owned inventory and set custom rates for partner properties.</p>
+                <h1 className="text-3xl font-black text-safari-900 tracking-tight">
+                  {managedCompanyId ? `${managedCompany?.name} Properties` : 'Property Ecosystem'}
+                </h1>
+                <p className="text-safari-500 font-bold">
+                  {managedCompanyId ? `Inventory and rates for ${managedCompany?.name}.` : 'Manage your owned inventory and set custom rates for partner properties.'}
+                </p>
               </div>
               <Tooltip content="Add a new lodge or camp to your owned inventory">
                 <button onClick={handleNewLodge} className="bg-safari-800 text-white px-8 py-3 rounded-lg font-bold uppercase text-xs tracking-widest hover:bg-safari-900 transition-all shadow-xl flex items-center gap-2"><Plus size={18} /> New Property</button>
@@ -1662,7 +1797,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                      </thead>
                      <tbody className="divide-y divide-safari-50">
                        {lodges.map(lodge => {
-                         const isOwner = lodge.company_id === company?.id;
+                         const isOwner = lodge.company_id === effectiveCompanyId;
                          const hasCustomRate = customRates.some(r => r.lodge_id === lodge.id);
                          
                          return (
@@ -1723,7 +1858,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         {activeTab === 'signature_safaris' && (
           <div className="p-8 max-w-7xl mx-auto space-y-8 animate-fadeIn">
             <header className="flex justify-between items-end">
-              <div><h1 className="text-3xl font-bold text-safari-900">Signature Safaris</h1><p className="text-safari-500 font-medium">Hand-crafted master itineraries.</p></div>
+              <div>
+                <h1 className="text-3xl font-black text-safari-900 tracking-tight">
+                  {managedCompanyId ? `${managedCompany?.name} Signature Collection` : 'Signature Safaris'}
+                </h1>
+                <p className="text-safari-500 font-bold">
+                  {managedCompanyId ? `Master itineraries for ${managedCompany?.name}.` : 'Hand-crafted master itineraries.'}
+                </p>
+              </div>
               <Tooltip content="Create a new master itinerary for your signature collection">
                 <button onClick={handleNewMaster} className="bg-safari-800 text-white px-8 py-3 rounded-lg font-bold uppercase text-xs tracking-widest hover:bg-safari-900 transition-all shadow-xl flex items-center gap-2"><Plus size={18} /> Create Safari</button>
               </Tooltip>
@@ -2164,6 +2306,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   </h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                    <div className="space-y-4">
+                       <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Agency Brand Logo</label>
+                       <div className="flex items-center gap-4">
+                         <div className="w-20 h-20 bg-safari-50 rounded-xl border border-safari-100 flex items-center justify-center overflow-hidden shadow-inner">
+                           {branding.agencyLogo ? (
+                             <img src={branding.agencyLogo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                           ) : (
+                             <Building2 className="text-safari-200" size={32} />
+                           )}
+                         </div>
+                         <div className="flex flex-col gap-2">
+                           <label className="px-4 py-2 bg-safari-900 text-white rounded-lg font-black text-[10px] uppercase tracking-widest hover:bg-safari-800 transition-all cursor-pointer shadow-md">
+                             <Upload size={14} className="inline mr-2" /> Upload Logo
+                             <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
+                           </label>
+                           {branding.agencyLogo && (
+                             <button 
+                               onClick={() => setBranding({ ...branding, agencyLogo: '' })}
+                               className="text-[10px] font-black uppercase text-red-500 hover:text-red-700 transition-colors text-left ml-2"
+                             >
+                               Remove
+                             </button>
+                           )}
+                         </div>
+                       </div>
+                    </div>
                     <div className="space-y-2">
                        <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Legal Agency/Property Name</label>
                        <input 
@@ -2628,8 +2796,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           <div className="p-8 max-w-7xl mx-auto space-y-8 animate-fadeIn">
             <header className="flex justify-between items-end">
               <div>
-                <h1 className="text-3xl font-bold text-safari-900">Safari Specialists</h1>
-                <p className="text-safari-500 font-medium">Manage your dedicated team members and specialists.</p>
+                <h1 className="text-3xl font-black text-safari-900 tracking-tight">
+                  {managedCompanyId ? `${managedCompany?.name} Team` : 'Safari Specialists'}
+                </h1>
+                <p className="text-safari-500 font-bold">
+                  {managedCompanyId ? `Manage staff for ${managedCompany?.name}.` : 'Manage your dedicated team members and specialists.'}
+                </p>
               </div>
               <button 
                 onClick={() => {
@@ -3360,6 +3532,7 @@ const SuperHubView = ({
   onEditLodge,
   onDeleteCompany,
   onUpdateCompanyStatus,
+  onUpdateCompanyScore,
   onDeleteUser,
   onDeleteProperty,
   onDeleteSafari,
@@ -3448,6 +3621,7 @@ const SuperHubView = ({
                 <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">Company / Instance</th>
                 <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest">Slug</th>
                 <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-center">Properties</th>
+                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-center">Score</th>
                 <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-right">Actions</th>
               </tr>
             </thead>
@@ -3477,6 +3651,22 @@ const SuperHubView = ({
                     <span className="px-4 py-2 bg-safari-50 text-safari-900 rounded-lg border border-safari-100 font-black text-sm">
                       {lodges.filter((l: any) => l.company_id === c.id).length}
                     </span>
+                  </td>
+                  <td className="px-8 py-6 text-center">
+                    <div className="flex flex-col items-center gap-1">
+                      <input 
+                        type="number" 
+                        min="20" 
+                        max="100" 
+                        className="w-16 p-2 bg-safari-50 border border-safari-100 rounded text-center font-bold text-xs"
+                        value={c.proficiencyScore || 20}
+                        onChange={(e) => {
+                          const val = Math.max(20, Math.min(100, Number(e.target.value)));
+                          onUpdateCompanyScore(c.id, val);
+                        }}
+                      />
+                      <span className="text-[8px] font-black uppercase tracking-widest text-safari-400">20-100</span>
+                    </div>
                   </td>
                   <td className="px-8 py-6 text-right relative">
                     <div className="flex justify-end items-center gap-3">
@@ -3882,13 +4072,34 @@ const LeadsView = ({ leads, isLoading, onCosting, onPreview }: any) => {
         {isLoading ? <LoadingView /> : leads.length === 0 ? <EmptyState icon={<MessageSquare size={48} />} title="No new leads" message="Inquiries will appear here automatically." /> : (
           <table className="w-full text-left">
             <thead className="bg-safari-50 border-b border-safari-100">
-              <tr><th className="px-6 py-4 text-[10px] font-bold uppercase text-safari-400">Client</th><th className="px-6 py-4 text-[10px] font-bold uppercase text-safari-400">Safari</th><th className="px-6 py-4 text-[10px] font-bold uppercase text-safari-400 text-right">Actions</th></tr>
+              <tr>
+                <th className="px-6 py-4 text-[10px] font-bold uppercase text-safari-400">Client</th>
+                <th className="px-6 py-4 text-[10px] font-bold uppercase text-safari-400">Safari</th>
+                <th className="px-6 py-4 text-[10px] font-bold uppercase text-safari-400 text-center">Routing</th>
+                <th className="px-6 py-4 text-[10px] font-bold uppercase text-safari-400 text-right">Actions</th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-safari-50">
               {leads.map((l: any) => (
                 <tr key={l.id} className="hover:bg-safari-50/30 group">
-                  <td className="px-6 py-4"><p className="font-bold text-safari-900">{l.customer_name}</p><span className="text-xs text-safari-500">{l.customer_email}</span></td>
-                  <td className="px-6 py-4"><p className="text-sm font-bold text-safari-600 truncate max-w-xs">{l.trip_title}</p></td>
+                  <td className="px-6 py-4">
+                    <p className="font-bold text-safari-900">{l.customer_name}</p>
+                    <span className="text-xs text-safari-500">{l.customer_email}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-sm font-bold text-safari-600 truncate max-w-xs">{l.trip_title}</p>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {l.form_data?.assignedPartnerName ? (
+                      <span className="px-2 py-1 bg-purple-50 text-purple-600 rounded text-[10px] font-black uppercase tracking-widest border border-purple-100">
+                        Assigned: {l.form_data.assignedPartnerName}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-amber-50 text-amber-600 rounded text-[10px] font-black uppercase tracking-widest border border-amber-100">
+                        Market Lead
+                      </span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-1.5">
                       <Tooltip content="Copy Public Link">

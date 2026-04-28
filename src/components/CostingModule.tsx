@@ -10,8 +10,10 @@ import {
   DollarSign, Plus, Trash2, Calculator, RefreshCw, 
   Info, Check, ArrowLeft, Download, Tag, Percent, Lock, Unlock,
   Users, BedDouble, Truck, CalendarClock, Ticket, Sparkles, UploadCloud, FileText,
-  Loader2, Wand2
+  Loader2, Wand2, LogIn, ShieldAlert
 } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { BrandingConfig, LodgeCustomRate } from '../types';
 
 interface CostingModuleProps {
   itinerary: GeneratedItinerary;
@@ -20,6 +22,7 @@ interface CostingModuleProps {
   branding: BrandingConfig;
   onBack: () => void;
   onSave?: (report: CostingReport, closeAfter?: boolean) => void;
+  onAuthRequired?: () => void;
   initialMode?: 'project' | 'calculator';
   backLabel?: string;
   customRates?: LodgeCustomRate[];
@@ -48,16 +51,43 @@ const CostingModule: React.FC<CostingModuleProps> = ({
   branding = {} as BrandingConfig,
   onBack, 
   onSave,
+  onAuthRequired,
   initialMode = 'project',
   backLabel = 'Back',
   customRates = []
 }) => {
+  const { user } = useAuth();
   // --- View Mode State ---
   const [activeMode, setActiveMode] = useState<'project' | 'calculator'>(initialMode);
 
   // --- Data State ---
   const [projectItems, setProjectItems] = useState<CostingLineItem[]>([]);
   const [calculatorItems, setCalculatorItems] = useState<CostingLineItem[]>([]);
+
+  // Usage tracking for standalone calculator
+  const [usageCount, setUsageCount] = useState(() => {
+    const saved = localStorage.getItem('calculator_usage_count');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [showUsageModal, setShowUsageModal] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem('calculator_usage_count', usageCount.toString());
+  }, [usageCount]);
+
+  const checkUsageLimit = () => {
+    if (!user && activeMode === 'calculator' && usageCount >= 3) {
+      setShowUsageModal(true);
+      return false;
+    }
+    return true;
+  };
+
+  const incrementUsage = () => {
+    if (!user && activeMode === 'calculator') {
+      setUsageCount(prev => prev + 1);
+    }
+  };
 
   // Derived state to determine which list is currently active
   const items = activeMode === 'project' ? projectItems : calculatorItems;
@@ -103,6 +133,10 @@ const CostingModule: React.FC<CostingModuleProps> = ({
 
   // --- AI SCANNER LOGIC ---
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!checkUsageLimit()) {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -165,6 +199,8 @@ const CostingModule: React.FC<CostingModuleProps> = ({
 
       const text = response.text;
       if (!text) throw new Error("Empty AI response");
+      
+      incrementUsage();
       
       let result;
       try {
@@ -383,6 +419,7 @@ const CostingModule: React.FC<CostingModuleProps> = ({
   };
 
   const addItem = (type: CostingItemType) => {
+    if (!checkUsageLimit()) return;
     setIsConfirmed(false);
     const newItem: CostingLineItem = {
       id: crypto.randomUUID(),
@@ -393,6 +430,7 @@ const CostingModule: React.FC<CostingModuleProps> = ({
       total: 0
     };
     setItems(prev => [...prev, newItem]);
+    incrementUsage();
   };
 
   const deleteItem = (id: string) => {
@@ -874,6 +912,49 @@ const CostingModule: React.FC<CostingModuleProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Usage Limit Modal */}
+      {showUsageModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-safari-900/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center space-y-6 animate-scaleIn">
+            <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto">
+              <ShieldAlert className="text-amber-600" size={40} />
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-safari-900">Limit Reached</h3>
+              <p className="text-safari-600 text-sm">
+                You've reached the free usage limit for the Safari Quick Calculator. 
+                Sign up for a free account to unlock unlimited access and professional agent features.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 pt-4">
+              <button 
+                onClick={() => {
+                  setShowUsageModal(false);
+                  onAuthRequired?.();
+                }}
+                className="w-full py-4 bg-safari-900 text-white rounded-xl font-black uppercase text-xs tracking-widest hover:bg-safari-800 transition-all flex items-center justify-center gap-2"
+              >
+                <LogIn size={16} /> Sign Up Now
+              </button>
+              <button 
+                onClick={() => setShowUsageModal(false)}
+                className="w-full py-3 text-safari-400 font-bold text-[10px] uppercase tracking-widest hover:text-safari-600 transition-colors"
+              >
+                Continue as Viewer
+              </button>
+            </div>
+
+            <div className="pt-4 border-t border-safari-50">
+              <p className="text-[9px] text-safari-400 font-black uppercase tracking-wider">
+                Agent Features: Save Quotes • Custom Branding • AI Sync
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

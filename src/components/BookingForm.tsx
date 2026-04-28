@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Send, User, Mail, Phone, Calendar, MessageSquare, Loader2, CheckCircle2, ChevronRight, ArrowLeft, ShieldCheck, Star, Plus, Minus } from 'lucide-react';
-import { GeneratedItinerary, SafariFormData, TeamMember } from '../types';
+import { GeneratedItinerary, SafariFormData, TeamMember, Company } from '../types';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
@@ -16,6 +16,9 @@ const BookingForm: React.FC<BookingFormProps> = ({ itinerary, formData, speciali
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
+  const [partners, setPartners] = useState<Company[]>([]);
+  const [isLoadingPartners, setIsLoadingPartners] = useState(false);
+  const [selectedPartner, setSelectedPartner] = useState<Company | null>(null);
   const [bookingData, setBookingData] = useState({
     name: formData.name || '',
     email: formData.email || '',
@@ -24,6 +27,51 @@ const BookingForm: React.FC<BookingFormProps> = ({ itinerary, formData, speciali
     guests: formData.guests || 2,
     message: `I am interested in booking the "${itinerary.tripTitle}" safari.`
   });
+
+  const [isSystemSafari, setIsSystemSafari] = useState(false);
+
+  useEffect(() => {
+    // Determine if this is a system/public safari
+    const checkSystemStatus = async () => {
+      if (!itinerary.company_id) {
+        setIsSystemSafari(true);
+        return;
+      }
+      try {
+        const { data } = await supabase
+          .from('companies')
+          .select('slug')
+          .eq('id', itinerary.company_id)
+          .single();
+        
+        if (data?.slug === 'system') {
+          setIsSystemSafari(true);
+        }
+      } catch (err) {
+        console.error("Error checking system status:", err);
+      }
+    };
+    checkSystemStatus();
+
+    const fetchPartners = async () => {
+      setIsLoadingPartners(true);
+      try {
+        const { data, error } = await supabase
+          .from('companies')
+          .select('*')
+          .not('slug', 'eq', 'system');
+        
+        if (!error && data) {
+          setPartners(data);
+        }
+      } catch (err) {
+        console.error("Error fetching partners:", err);
+      } finally {
+        setIsLoadingPartners(false);
+      }
+    };
+    fetchPartners();
+  }, []);
 
   const isValidEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -38,7 +86,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ itinerary, formData, speciali
 
     try {
       const { error } = await supabase.from('itineraries').insert([{
-        company_id: itinerary.company_id,
+        company_id: selectedPartner?.id || itinerary.company_id,
         customer_name: bookingData.name,
         customer_email: bookingData.email.toLowerCase().trim(),
         trip_title: itinerary.tripTitle,
@@ -47,7 +95,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ itinerary, formData, speciali
           phone: bookingData.phone,
           preferredDate: bookingData.preferredDate,
           guests: bookingData.guests,
-          bookingMessage: bookingData.message
+          bookingMessage: bookingData.message,
+          assignedPartnerName: selectedPartner?.name
         },
         itinerary_data: itinerary,
         status: 'booking_request'
@@ -65,6 +114,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ itinerary, formData, speciali
     }
   };
 
+  const totalSteps = isSystemSafari ? 4 : 3;
+
   const nextStep = () => {
     if (step === 1 && !bookingData.preferredDate) {
       setShowErrors(true);
@@ -75,9 +126,21 @@ const BookingForm: React.FC<BookingFormProps> = ({ itinerary, formData, speciali
       return;
     }
     setShowErrors(false);
-    setStep(s => Math.min(s + 1, 3));
+    
+    // Skip step 3 (partners) if not a system safari
+    if (step === 2 && !isSystemSafari) {
+      setStep(4);
+    } else {
+      setStep(s => Math.min(s + 1, 4));
+    }
   };
-  const prevStep = () => setStep(s => Math.max(s - 1, 1));
+  const prevStep = () => {
+    if (step === 4 && !isSystemSafari) {
+      setStep(2);
+    } else {
+      setStep(s => Math.max(s - 1, 1));
+    }
+  };
 
   const [referenceNumber, setReferenceNumber] = useState('');
   useEffect(() => {
@@ -144,7 +207,7 @@ const BookingForm: React.FC<BookingFormProps> = ({ itinerary, formData, speciali
           )}
           <div>
             <h3 className="text-2xl font-title font-bold text-safari-900">Book This Safari</h3>
-            <p className="text-[10px] font-black uppercase tracking-widest text-safari-400">Step {step} of 3</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-safari-400">Step {step === 4 && !isSystemSafari ? 3 : step} of {totalSteps}</p>
           </div>
         </div>
       </div>
@@ -153,8 +216,8 @@ const BookingForm: React.FC<BookingFormProps> = ({ itinerary, formData, speciali
       <div className="h-1.5 w-full bg-safari-50">
         <motion.div 
           className="h-full bg-safari-500"
-          initial={{ width: '33.33%' }}
-          animate={{ width: `${(step / 3) * 100}%` }}
+          initial={{ width: '25%' }}
+          animate={{ width: `${((step === 4 && !isSystemSafari ? 3 : step) / totalSteps) * 100}%` }}
         />
       </div>
 
@@ -309,6 +372,81 @@ const BookingForm: React.FC<BookingFormProps> = ({ itinerary, formData, speciali
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
+              className="space-y-6"
+            >
+              <div className="space-y-2">
+                <h4 className="text-xl font-bold text-safari-900">Match with an Expert</h4>
+                <p className="text-sm text-safari-500">Pick a dedicated partner to handle your logistics, or continue directly.</p>
+              </div>
+
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                {partners.length === 0 && !isLoadingPartners ? (
+                  <div className="p-4 bg-safari-50 border border-dashed border-safari-200 rounded-lg text-center text-xs text-safari-400">
+                    No active partners available at the moment.
+                  </div>
+                ) : partners.map((partner) => (
+                  <div 
+                    key={partner.id}
+                    onClick={() => setSelectedPartner(selectedPartner?.id === partner.id ? null : partner)}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer group ${
+                      selectedPartner?.id === partner.id 
+                        ? 'bg-safari-900 border-safari-900 text-white shadow-lg scale-[1.01]' 
+                        : 'bg-white border-safari-100 hover:border-safari-300'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex gap-4">
+                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center shrink-0 ${
+                          selectedPartner?.id === partner.id ? 'bg-white/10' : 'bg-safari-50'
+                        }`}>
+                          {partner.branding?.agencyLogo ? (
+                            <img src={partner.branding.agencyLogo} alt={partner.name} className="w-full h-full object-contain p-1" />
+                          ) : (
+                            <ShieldCheck className={selectedPartner?.id === partner.id ? 'text-white' : 'text-safari-300'} />
+                          )}
+                        </div>
+                        <div>
+                          <h5 className={`font-bold ${selectedPartner?.id === partner.id ? 'text-white' : 'text-safari-900'}`}>
+                            {partner.name}
+                          </h5>
+                          <div className="flex items-center gap-1 mt-1">
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Success Score:</span>
+                            <div className="flex gap-0.5">
+                              {[1, 2, 3, 4, 5].map((s) => (
+                                <Star 
+                                  key={s} 
+                                  size={10} 
+                                  fill={s <= (partner.proficiencyScore ? Math.max(1, Math.round(partner.proficiencyScore / 20)) : 1) ? "currentColor" : "none"} 
+                                  className={selectedPartner?.id === partner.id ? "text-safari-300" : "text-yellow-500"}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {selectedPartner?.id === partner.id && <CheckCircle2 size={20} className="text-white" />}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="pt-2 text-center">
+                <button 
+                  onClick={() => { setSelectedPartner(null); nextStep(); }}
+                  className="text-[10px] font-black uppercase tracking-widest text-safari-400 hover:text-safari-600 transition-colors"
+                >
+                  Skip and go with Super Admin
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {step === 4 && (
+            <motion.div 
+              key="step4"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
               className="space-y-8"
             >
               <div className="space-y-2">
@@ -351,12 +489,12 @@ const BookingForm: React.FC<BookingFormProps> = ({ itinerary, formData, speciali
         </AnimatePresence>
 
         <div className="mt-10 pt-8 border-t border-safari-100">
-          {step < 3 ? (
+          {(step < 4 && (step !== 2 || isSystemSafari)) ? (
             <button 
               onClick={nextStep}
               className="w-full py-5 bg-safari-900 text-white rounded-md font-black uppercase text-xs tracking-widest flex items-center justify-center gap-3 hover:bg-safari-800 transition-all shadow-xl active:scale-[0.98]"
             >
-              Continue to {step === 1 ? 'Contact Details' : 'Final Step'} <ChevronRight size={18} />
+              Continue to {step === 1 ? 'Contact Details' : step === 2 ? 'Partner Expert' : 'Final Step'} <ChevronRight size={18} />
             </button>
           ) : (
             <button 

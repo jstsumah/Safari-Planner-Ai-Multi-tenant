@@ -27,6 +27,7 @@ export interface Company {
   name: string;
   slug: string;
   branding?: BrandingConfig;
+  proficiencyScore?: number; // 1-100 rating
   created_at?: string;
   updated_at?: string;
 }
@@ -101,6 +102,7 @@ export interface BrandingConfig {
   contactAddress?: string;
   agencyName?: string;
   agencyDescription?: string;
+  agencyLogo?: string;
   establishedYear?: string;
   statistics?: { label: string; value: string; iconType: 'heart' | 'globe' | 'shield' | 'award' | 'users' | 'star' }[];
   socialLinks?: { platform: string; url: string }[];
@@ -228,6 +230,7 @@ export interface TeamMember {
 export interface GeneratedItinerary {
   id?: string;
   company_id?: string;
+  assigned_company_id?: string; // Routing for lead assignment
   tripTitle: string;
   summary: string;
   totalEstimatedCost: string;

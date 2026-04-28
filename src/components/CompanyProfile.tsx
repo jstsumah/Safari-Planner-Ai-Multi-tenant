@@ -222,8 +222,12 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
         {/* Header Navigation */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white rounded-xl shadow-xl flex items-center justify-center border border-safari-100">
-              <Building2 style={{ color: primaryColor }} size={24} />
+            <div className="w-12 h-12 bg-white rounded-xl shadow-xl flex items-center justify-center border border-safari-100 overflow-hidden">
+              {branding?.agencyLogo ? (
+                <img src={branding.agencyLogo} alt="Logo" className="w-full h-full object-contain p-1" referrerPolicy="no-referrer" />
+              ) : (
+                <Building2 style={{ color: primaryColor }} size={24} />
+              )}
             </div>
             <div>
               <h1 className="text-2xl font-bold text-safari-900 font-serif italic tracking-tight" style={{ color: secondaryColor }}>

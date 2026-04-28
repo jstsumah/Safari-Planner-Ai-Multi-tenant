@@ -758,6 +758,11 @@ const App: React.FC = () => {
               lodges={lodges} 
               branding={branding}
               onBack={navigateHome} 
+              onAuthRequired={() => {
+                setAuthMode('signup');
+                setAuthType('user');
+                navigateToView('auth');
+              }}
               initialMode="calculator"
             />
           </main>

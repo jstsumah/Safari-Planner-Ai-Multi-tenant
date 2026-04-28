@@ -196,6 +196,17 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 animate-fadeIn pb-20 relative">
+      {/* Branding Header */}
+      {branding?.agencyLogo && (
+        <div className="flex justify-between items-center bg-white border border-safari-100 p-4 rounded-xl shadow-sm">
+          <img src={branding.agencyLogo} alt="Logo" className="h-10 w-auto object-contain" referrerPolicy="no-referrer" />
+          <div className="text-right">
+            <p className="text-[10px] font-black uppercase text-safari-400 tracking-widest leading-none mb-1">Proposal By</p>
+            <p className="text-sm font-bold text-safari-900 leading-none">{branding?.agencyName || branding?.appName}</p>
+          </div>
+        </div>
+      )}
+
       <EmailModal 
         isOpen={isEmailModalOpen}
         onClose={() => setIsEmailModalOpen(false)}

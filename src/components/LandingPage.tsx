@@ -160,9 +160,17 @@ const LandingPage: React.FC<LandingPageProps> = ({
       {/* Navigation */}
       <nav className="fixed top-0 w-full z-[100] bg-white border-b border-safari-100">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-            <Compass className="text-safari-600" size={32} />
-            <span className="text-xl font-extrabold tracking-tight">Safari<span className="text-safari-500">Planner.ai</span></span>
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+            {branding?.agencyLogo ? (
+              <img src={branding.agencyLogo} alt="Logo" className="h-10 w-auto object-contain" referrerPolicy="no-referrer" />
+            ) : (
+              <Compass className="text-safari-600" size={32} />
+            )}
+            <span className="text-xl font-extrabold tracking-tight">
+              {branding?.agencyLogo ? null : (
+                <>Safari<span className="text-safari-500">Planner.ai</span></>
+              )}
+            </span>
           </div>
 
           {/* Desktop Links */}
