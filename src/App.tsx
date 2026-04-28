@@ -17,6 +17,7 @@ import { supabase } from './lib/supabase';
 import { Compass, Settings, AlertTriangle, Calculator, Loader2, LogOut, Menu, X, Home, User, Briefcase, Calculator as CalcIcon } from 'lucide-react';
 import { Toaster } from 'sonner';
 import { Tooltip } from './components/ui/Tooltip';
+import { Analytics } from '@vercel/analytics/react';
 
 import DatabaseStatus from './components/DatabaseStatus';
 
@@ -1021,6 +1022,7 @@ const App: React.FC = () => {
           }} 
         />
       )}
+      <Analytics />
     </>
   );
 };
