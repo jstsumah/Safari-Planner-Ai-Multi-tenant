@@ -26,9 +26,18 @@ interface Review {
 
 interface TeamMember {
   id: string;
-  full_name: string;
+  name: string;
   role: string;
-  avatar_url?: string;
+  photo_url?: string;
+  is_public?: boolean;
+}
+
+interface Safari {
+  id: string;
+  title: string;
+  summary: string;
+  itinerary_data: any;
+  created_at: string;
 }
 
 interface CompanyProfileProps {
@@ -37,9 +46,20 @@ interface CompanyProfileProps {
   onClose: () => void;
 }
 
+interface Lodge {
+  id: string;
+  name: string;
+  location: string;
+  property_type: string;
+  tier: string;
+  images: string[];
+}
+
 const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: defaultBranding, onClose }) => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
+  const [lodges, setLodges] = useState<Lodge[]>([]);
+  const [safaris, setSafaris] = useState<Safari[]>([]);
   const [newReview, setNewReview] = useState({ author_name: '', rating: 5, comment: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [companyInfo, setCompanyInfo] = useState<any>(null);
@@ -67,17 +87,30 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
   const fetchTeam = useCallback(async () => {
     const { data } = await supabase
       .from('team_members')
-      .select('id, name, role, photo_url')
+      .select('id, name, role, photo_url, is_public')
+      .eq('company_id', companyId)
+      .neq('is_public', false)
+      .limit(6);
+    if (data) setTeam(data);
+  }, [companyId]);
+
+  const fetchLodges = useCallback(async () => {
+    const { data } = await supabase
+      .from('lodges')
+      .select('id, name, location, property_type, tier, images')
       .eq('company_id', companyId)
       .limit(6);
-    if (data) {
-      setTeam(data.map(m => ({
-        id: m.id,
-        full_name: m.name,
-        role: m.role,
-        avatar_url: m.photo_url
-      })));
-    }
+    if (data) setLodges(data);
+  }, [companyId]);
+
+  const fetchSafaris = useCallback(async () => {
+    // Fetch master itineraries as the "marketing portfolio" safaris
+    const { data } = await supabase
+      .from('master_itineraries')
+      .select('id, title, summary, itinerary_data, created_at')
+      .eq('company_id', companyId)
+      .limit(3);
+    if (data) setSafaris(data);
   }, [companyId]);
 
   useEffect(() => {
@@ -85,9 +118,11 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
       await fetchCompanyData();
       await fetchReviews();
       await fetchTeam();
+      await fetchLodges();
+      await fetchSafaris();
     };
     init();
-  }, [fetchCompanyData, fetchReviews, fetchTeam]);
+  }, [fetchCompanyData, fetchReviews, fetchTeam, fetchLodges, fetchSafaris]);
 
   const handleAddReview = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,12 +176,24 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
               <p className="text-safari-400 text-sm font-medium uppercase tracking-widest">{companyInfo?.slug || 'agency-portal'}</p>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="px-6 py-2.5 bg-white border border-safari-200 text-safari-600 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-safari-50 transition-all shadow-sm"
-          >
-            Close Profile
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => {
+                const url = `${window.location.origin}${window.location.pathname}?company=${companyId}`;
+                navigator.clipboard.writeText(url);
+                toast.success("Profile link copied to clipboard!");
+              }}
+              className="px-4 py-2.5 bg-safari-900 text-white rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-safari-800 transition-all shadow-md flex items-center gap-2"
+            >
+              <Globe size={14} /> Share Profile
+            </button>
+            <button 
+              onClick={onClose}
+              className="px-6 py-2.5 bg-white border border-safari-200 text-safari-600 rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-safari-50 transition-all shadow-sm"
+            >
+              Close Profile
+            </button>
+          </div>
         </div>
 
         {/* Hero Section */}
@@ -242,16 +289,16 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
                   <div key={member.id} className="group text-center space-y-3">
                     <div className="relative aspect-square rounded-lg overflow-hidden shadow-lg border-4 border-white">
                       <img 
-                        src={member.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${member.full_name}`} 
+                        src={member.photo_url || `https://api.dicebear.com/7.x/initials/svg?seed=${member.name}`} 
                         className="w-full h-full object-cover"
-                        alt={member.full_name}
+                        alt={member.name}
                       />
                       <div className="absolute inset-0 bg-safari-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <Users className="text-white" size={24} />
                       </div>
                     </div>
                     <div>
-                      <p className="font-bold text-safari-900">{member.full_name}</p>
+                      <p className="font-bold text-safari-900">{member.name}</p>
                       <p className="text-[10px] font-black text-safari-400 uppercase tracking-widest">{member.role}</p>
                     </div>
                   </div>
@@ -280,13 +327,13 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
                 { icon: <Phone size={20} />, label: 'Phone', value: branding?.contactPhone || '+254 700 000000' },
                 { icon: <Globe size={20} />, label: 'WhatsApp', value: branding?.whatsappNumber || 'Available' }
               ].map((item, idx) => (
-                <div key={idx} className="flex items-start gap-4 p-4 rounded-xl hover:bg-white/5 transition-all cursor-default">
-                  <div className="p-3 bg-white/10 rounded-lg text-safari-300">
+                <div key={idx} className="flex items-start gap-4 p-4 rounded-xl hover:bg-white/5 transition-all cursor-default overflow-hidden">
+                  <div className="p-3 bg-white/10 rounded-lg text-safari-300 flex-shrink-0">
                     {item.icon}
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-[10px] font-black uppercase text-safari-400 tracking-widest mb-1">{item.label}</p>
-                    <p className="font-bold text-safari-50 tracking-tight">{item.value}</p>
+                    <p className="font-bold text-safari-50 tracking-tight truncate hover:whitespace-normal transition-all" title={item.value}>{item.value}</p>
                   </div>
                 </div>
               ))}
@@ -299,6 +346,108 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
             </div>
           </div>
         </div>
+
+        {/* Safaris Portfolio */}
+        {safaris.length > 0 && (
+          <section className="space-y-10 animate-fadeIn">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-6 text-center md:text-left">
+              <div>
+                <h3 className="text-3xl font-bold text-safari-900 font-serif italic tracking-tight">Curated Expeditions</h3>
+                <p className="text-safari-500 font-medium italic tracking-tight">Our benchmark itineraries designed by conservation experts.</p>
+              </div>
+              <div className="flex flex-col items-center md:items-end gap-2">
+                <p className="text-safari-400 text-xs font-black uppercase tracking-widest">Featured Safaris</p>
+                <button 
+                  onClick={() => {
+                    const url = `${window.location.origin}${window.location.pathname}?company=${companyId}`;
+                    window.open(url, '_blank');
+                  }}
+                  className="text-safari-900 font-bold text-[10px] uppercase border-b-2 border-safari-900 pb-1 hover:text-safari-600 hover:border-safari-600 transition-all"
+                >
+                  View All Experiences
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {safaris.map((safari) => (
+                <div key={safari.id} className="bg-white rounded-2xl overflow-hidden border border-safari-50 shadow-sm hover:shadow-2xl transition-all group">
+                  <div className="relative aspect-[16/10] overflow-hidden">
+                    <img 
+                      src={safari.itinerary_data?.highlights?.[0]?.image_url || "https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&q=80&w=1000"} 
+                      alt={safari.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <h4 className="text-white font-bold text-lg leading-tight mb-1">{safari.title}</h4>
+                      <p className="text-white/70 text-xs line-clamp-1">{safari.summary}</p>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <button 
+                      onClick={() => window.open(`${window.location.origin}${window.location.pathname}?master=${safari.id}`, '_blank')}
+                      className="w-full py-3 bg-safari-50 text-safari-900 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-safari-900 hover:text-white transition-all"
+                    >
+                      View Itinerary
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Properties Portfolio (Accommodation Providers) */}
+        {lodges.length > 0 && (
+          <section className="space-y-10 animate-fadeIn">
+            <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-6 text-center md:text-left">
+              <div>
+                <h3 className="text-3xl font-bold text-safari-900 font-serif italic tracking-tight">Signature Portfolio</h3>
+                <p className="text-safari-500 font-medium italic tracking-tight">Our exclusive collection of wild escapes and luxury lodges.</p>
+              </div>
+              <p className="text-safari-400 text-xs font-black uppercase tracking-widest">{lodges.length} Properties Available</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {lodges.map((lodge) => (
+                <div key={lodge.id} className="group bg-white rounded-xl overflow-hidden shadow-sm border border-safari-50 hover:shadow-2xl transition-all duration-500">
+                  <div className="relative aspect-[4/3] overflow-hidden">
+                    <img 
+                      src={lodge.images?.[0] || "https://images.unsplash.com/photo-1493246507139-91e8bef99c02?auto=format&fit=crop&q=80&w=1000"} 
+                      alt={lodge.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    <div className="absolute bottom-4 left-4 text-white">
+                      <div className="flex items-center gap-1 text-[8px] font-black uppercase tracking-[0.2em] mb-1">
+                        <MapPin size={10} />
+                        {lodge.location}
+                      </div>
+                      <h4 className="font-bold text-lg leading-tight">{lodge.name}</h4>
+                    </div>
+                    <div className="absolute top-4 right-4 flex flex-col gap-2">
+                      <span className="px-3 py-1 bg-white/20 backdrop-blur-md text-white rounded-full text-[8px] font-black uppercase tracking-widest border border-white/30">
+                        {lodge.property_type}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-safari-400">
+                      <span>{lodge.tier}</span>
+                      <div className="flex text-amber-500">
+                        {[1,2,3,4,5].map(i => <Star key={i} size={10} fill="currentColor" />)}
+                      </div>
+                    </div>
+                    <button className="w-full py-3 border border-safari-900 text-safari-900 rounded-lg font-black text-[10px] uppercase tracking-widest hover:bg-safari-900 hover:text-white transition-all group-hover:shadow-lg group-hover:shadow-safari-900/10">
+                      View Details
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Reviews Section */}
         <section className="space-y-10">

@@ -305,6 +305,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     photo_url: '',
     email: '',
     phone: '',
+    is_public: true,
     system_role: 'staff' as 'admin' | 'staff'
   });
 
@@ -2345,7 +2346,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               <button 
                 onClick={() => {
                   setSelectedMember(null);
-                  setMemberFormData({ name: '', role: '', bio: '', photo_url: '', email: '', phone: '', system_role: 'staff' });
+                  setMemberFormData({ name: '', role: '', bio: '', photo_url: '', email: '', phone: '', is_public: true, system_role: 'staff' });
                   setIsTeamModalOpen(true);
                 }} 
                 className="bg-safari-800 text-white px-8 py-3 rounded-lg font-bold uppercase text-xs tracking-widest hover:bg-safari-900 transition-all shadow-xl flex items-center gap-2"
@@ -2384,8 +2385,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-safari-900 truncate">{member.name}</h3>
-                        <p className="text-[10px] font-black uppercase text-safari-400 mb-1">{member.role}</p>
-                        <div className="flex flex-col gap-1">
+                      <p className="text-[10px] font-black uppercase text-safari-400 mb-1">{member.role}</p>
+                      <div className="flex items-center gap-2 mb-1">
+                        {member.is_public !== false ? (
+                          <span className="px-1.5 py-0.5 bg-green-100 text-green-600 text-[8px] font-black uppercase rounded">Public Profile</span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 bg-safari-100 text-safari-400 text-[8px] font-black uppercase rounded">Private Profile</span>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1">
                            <p className="text-[10px] text-safari-500 flex items-center gap-2 truncate"><Mail size={10} className="flex-shrink-0" /> {member.email}</p>
                            {member.phone && <p className="text-[10px] text-safari-500 flex items-center gap-2"><Phone size={10} className="flex-shrink-0" /> {member.phone}</p>}
                         </div>
@@ -2403,6 +2411,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                             photo_url: member.photo_url || '',
                             email: member.email || '',
                             phone: member.phone || '',
+                            is_public: member.is_public !== false,
                             system_role: (member as any).system_role || 'staff'
                           });
                           setIsTeamModalOpen(true);
@@ -3009,6 +3018,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                     rows={3}
                     className="w-full px-4 py-2 bg-safari-50 border border-safari-100 rounded-lg focus:ring-2 focus:ring-safari-500 outline-none resize-none"
                   />
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-safari-50 border border-safari-100 rounded-xl">
+                  <div>
+                    <p className="text-xs font-bold text-safari-900">Public Profile</p>
+                    <p className="text-[10px] text-safari-500">Show this member on the company public profile page.</p>
+                  </div>
+                  <button 
+                    onClick={() => setMemberFormData({...memberFormData, is_public: !memberFormData.is_public})}
+                    className={`w-12 h-6 rounded-full transition-colors relative flex items-center px-1 ${memberFormData.is_public ? 'bg-safari-900' : 'bg-safari-200'}`}
+                  >
+                    <div className={`w-4 h-4 bg-white rounded-full transition-transform ${memberFormData.is_public ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
                 </div>
               </div>
             </div>

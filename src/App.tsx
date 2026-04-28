@@ -463,6 +463,7 @@ const App: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     const itinId = params.get('itin');
     const masterId = params.get('master');
+    const companyIdParam = params.get('company');
 
     // Defer side-effect fetches to avoid synchronous cascade warnings
     const timeoutId = setTimeout(() => {
@@ -470,6 +471,9 @@ const App: React.FC = () => {
         fetchSharedItinerary(itinId);
       } else if (masterId) {
         fetchMasterItinerary(masterId);
+      } else if (companyIdParam) {
+        setSelectedCompanyId(companyIdParam);
+        setIsProfileOpen(true);
       }
     }, 0);
     return () => clearTimeout(timeoutId);
@@ -564,7 +568,7 @@ const App: React.FC = () => {
   };
 
   // Allow shared views, the planner form and results to be public
-  const isPublicView = isSharedView || viewMode === 'calculator' || viewMode === 'landing' || viewMode === 'auth' || viewMode === 'form' || viewMode === 'itinerary';
+  const isPublicView = isSharedView || viewMode === 'calculator' || viewMode === 'landing' || viewMode === 'auth' || viewMode === 'form' || viewMode === 'itinerary' || viewMode === 'partners';
 
   // Improved loading logic to prevent data loss on tab switch/refresh
   const showFullLoader = authLoading && !isPublicView && !user && !profile;
@@ -581,18 +585,18 @@ const App: React.FC = () => {
   }
 
   if (!user && !isPublicView) {
-    return <Onboarding onComplete={(type) => navigateToView(type === 'user' ? 'history' : 'admin')} />;
+    return <Onboarding onBack={navigateHome} onComplete={(type) => navigateToView(type === 'user' ? 'history' : 'admin')} />;
   }
 
   if (user && !company && !isPublicView && !authLoading) {
     // If no profile exists, they need to complete onboarding
     if (!profile) {
-      return <Onboarding onComplete={(type) => navigateToView(type === 'user' ? 'history' : 'admin')} />;
+      return <Onboarding onBack={navigateHome} onComplete={(type) => navigateToView(type === 'user' ? 'history' : 'admin')} />;
     }
     
     // If they have a profile, only non-travelers (agencies/providers) require a company
     if (profile.user_type !== 'user') {
-      return <Onboarding onComplete={(type) => navigateToView(type === 'user' ? 'history' : 'admin')} />;
+      return <Onboarding onBack={navigateHome} onComplete={(type) => navigateToView(type === 'user' ? 'history' : 'admin')} />;
     }
   }
 

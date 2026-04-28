@@ -221,6 +221,7 @@ export interface TeamMember {
   photo_url: string;
   email: string;
   phone: string;
+  is_public?: boolean;
   created_at?: string;
 }
 

@@ -1,5 +1,18 @@
 -- Multi-tenant Safari Planner Database Schema
 
+-- Helper function to check if current user is super user
+CREATE OR REPLACE FUNCTION is_super_user()
+RETURNS BOOLEAN AS $$
+  SELECT is_super_user FROM profiles WHERE id = auth.uid();
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
+
+-- Helper function to get current company_id
+CREATE OR REPLACE FUNCTION get_my_company()
+RETURNS UUID AS $$
+  -- SECURITY DEFINER is used to bypass RLS recursion on the profiles table
+  SELECT company_id FROM profiles WHERE id = auth.uid();
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
+
 -- Companies Table
 CREATE TABLE IF NOT EXISTS companies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -136,6 +149,7 @@ CREATE TABLE IF NOT EXISTS team_members (
     phone TEXT,
     bio TEXT,
     photo_url TEXT,
+    is_public BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -185,19 +199,6 @@ ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lodge_custom_rates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE park_fees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE global_activities ENABLE ROW LEVEL SECURITY;
-
--- Helper function to check if current user is super user
-CREATE OR REPLACE FUNCTION is_super_user()
-RETURNS BOOLEAN AS $$
-  SELECT is_super_user FROM profiles WHERE id = auth.uid();
-$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
-
--- Helper function to get current company_id
-CREATE OR REPLACE FUNCTION get_my_company()
-RETURNS UUID AS $$
-  -- SECURITY DEFINER is used to bypass RLS recursion on the profiles table
-  SELECT company_id FROM profiles WHERE id = auth.uid();
-$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
 -- RLS Policies
 
