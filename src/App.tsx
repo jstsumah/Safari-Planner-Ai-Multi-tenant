@@ -18,6 +18,8 @@ import { Compass, Settings, AlertTriangle, Calculator, Loader2, LogOut, Menu, X,
 import { Toaster } from 'sonner';
 import { Tooltip } from './components/ui/Tooltip';
 
+import DatabaseStatus from './components/DatabaseStatus';
+
 // Dummy Data for Standalone Calculator Mode
 const DUMMY_ITINERARY_STANDALONE: GeneratedItinerary = {
   tripTitle: 'Quick Costing Estimate',
@@ -760,8 +762,9 @@ const App: React.FC = () => {
             />
           </main>
 
-          <footer className="p-8 text-center text-safari-400 text-[10px] font-medium uppercase tracking-[0.2em]">
-            © 2026 SafariPlanner.ai • Powered by Intelligence, Crafted by Humans
+          <footer className="p-8 flex flex-col items-center gap-4 text-center text-safari-400 text-[10px] font-medium uppercase tracking-[0.2em]">
+            <DatabaseStatus />
+            <p>© 2026 SafariPlanner.ai • Powered by Intelligence, Crafted by Humans</p>
           </footer>
         </div>
       );
@@ -983,6 +986,13 @@ const App: React.FC = () => {
             />
           )}
         </main>
+        
+        <footer className="max-w-7xl mx-auto px-8 sm:px-6 lg:px-8 py-8 border-t border-safari-100 flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-[10px] font-bold uppercase text-safari-400 tracking-widest">
+            © 2026 {branding.agencyName || "SafariPlanner.ai"} • Powered by Intelligence
+          </p>
+          <DatabaseStatus />
+        </footer>
       </div>
     );
   };

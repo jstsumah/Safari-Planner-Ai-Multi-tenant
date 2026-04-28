@@ -34,10 +34,15 @@ const PartnersPage: React.FC<PartnersPageProps> = ({ onBack, onViewProfile, bran
         .eq('status', 'active')
         .order('name');
       
-      if (error) throw error;
+      if (error) {
+        console.error("Partner Companies Fetch Error:", error.message);
+        setCompanies([]);
+        return;
+      }
       setCompanies(data || []);
     } catch (err) {
       console.error("Failed to fetch companies:", err);
+      setCompanies([]);
     } finally {
       setIsLoading(false);
     }

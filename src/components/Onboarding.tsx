@@ -149,6 +149,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
     if (err.message?.toLowerCase().includes('rate limit')) {
       return "Security limit reached. Please wait about an hour before trying to register or sign in again, or try a different email.";
     }
+    if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
+      return "Network error: Unable to reach the database. Please check your internet connection or verify the Supabase configuration.";
+    }
     return err.message;
   };
 

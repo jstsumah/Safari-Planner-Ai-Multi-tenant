@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { Lodge, SafariFormData, GeneratedItinerary, CostingReport, Payment, BudgetTier, TransportType, BrandingConfig, TeamMember } from '../types';
 import CompanyProfile from './CompanyProfile';
 import { supabase } from '../lib/supabase';
+import DatabaseStatus from './DatabaseStatus';
 import CostingModule from './CostingModule';
 import InvoiceModule from './InvoiceModule';
 import PaymentModule from './PaymentModule';
@@ -2569,8 +2570,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       </nav>
       
       {/* Footer for Desktop Views */}
-      <footer className="hidden lg:block bg-white border-t border-safari-200 p-4 text-center text-[10px] uppercase tracking-widest text-safari-400 font-bold shrink-0 z-30">
-        © {new Date().getFullYear()} SafariPlanner.ai • Partner Dashboard
+      <footer className="hidden lg:flex items-center justify-center gap-4 bg-white border-t border-safari-200 p-4 text-center text-[10px] uppercase tracking-widest text-safari-400 font-bold shrink-0 z-30">
+        <span>© {new Date().getFullYear()} SafariPlanner.ai • Partner Dashboard</span>
+        <DatabaseStatus />
       </footer>
       </div>
 

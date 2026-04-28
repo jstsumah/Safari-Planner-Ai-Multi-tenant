@@ -10,7 +10,7 @@ import {
 import { Tooltip } from './ui/Tooltip';
 import { supabase } from '../lib/supabase';
 
-import { BrandingConfig } from '../types';
+import DatabaseStatus from './DatabaseStatus';
 
 interface LandingPageProps {
   onStart: () => void;
@@ -41,8 +41,16 @@ const LandingPage: React.FC<LandingPageProps> = ({
 
   React.useEffect(() => {
     const fetchCompanies = async () => {
-      const { data } = await supabase.from('companies').select('*').limit(10);
-      if (data) setCompanies(data);
+      try {
+        const { data, error } = await supabase.from('companies').select('*').limit(10);
+        if (error) {
+          console.error("Home Companies Fetch Error:", error.message);
+          return;
+        }
+        if (data) setCompanies(data);
+      } catch (err) {
+        console.error("Home Companies unexpected error:", err);
+      }
     };
     fetchCompanies();
   }, []);
@@ -830,8 +838,10 @@ const LandingPage: React.FC<LandingPageProps> = ({
           <p className="text-[10px] font-bold uppercase text-safari-400 tracking-widest">
             © {new Date().getFullYear()} {branding.agencyName || "SafariPlanner.ai"} • Powered by Intelligence, Crafted by Humans
           </p>
-          <div className="flex gap-6">
-            {branding.socialLinks && branding.socialLinks.length > 0 ? (
+          <div className="flex items-center gap-6">
+            <DatabaseStatus />
+            <div className="flex gap-6">
+              {branding.socialLinks && branding.socialLinks.length > 0 ? (
               branding.socialLinks.map((link, idx) => {
                 const Icon = link.platform === 'Globe' ? Globe : link.platform === 'ShieldCheck' ? ShieldCheck : Globe;
                 return (
@@ -848,7 +858,8 @@ const LandingPage: React.FC<LandingPageProps> = ({
             )}
           </div>
         </div>
-      </footer>
+      </div>
+    </footer>
     </div>
   );
 };
