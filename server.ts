@@ -46,14 +46,17 @@ async function startServer() {
       if (!GEMINI_API_KEY) return res.status(503).json({ message: 'AI service not configured' });
 
       const { GoogleGenAI } = await import("@google/genai");
-      const ai = new GoogleGenAI(GEMINI_API_KEY);
-      const model = ai.getGenerativeModel({ 
-        model: "gemini-1.5-flash",
-        generationConfig: { responseMimeType: "application/json" }
+      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+        },
       });
-
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
+      
+      const responseText = response.text;
+      if (!responseText) throw new Error("Empty AI response");
       
       return res.json(JSON.parse(responseText));
     } catch (error: any) {

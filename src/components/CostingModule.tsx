@@ -30,18 +30,18 @@ interface CostingModuleProps {
 
 // Admin Defined Park Fees (Defaults)
 const KNOWN_PARKS = [
-  { name: 'Masai Mara', keywords: ['Mara', 'Maasai Mara'], rate: 200 },
-  { name: 'Serengeti', keywords: ['Serengeti'], rate: 83 },
-  { name: 'Ngorongoro', keywords: ['Ngorongoro'], rate: 71 },
-  { name: 'Amboseli', keywords: ['Amboseli'], rate: 100 },
-  { name: 'Lake Nakuru', keywords: ['Nakuru'], rate: 100 },
-  { name: 'Tarangire', keywords: ['Tarangire'], rate: 59 },
-  { name: 'Samburu', keywords: ['Samburu'], rate: 70 },
-  { name: 'Tsavo', keywords: ['Tsavo'], rate: 52 },
-  { name: 'Ol Pejeta', keywords: ['Ol Pejeta', 'Sweetwaters'], rate: 90 },
-  { name: 'Nairobi National Park', keywords: ['Nairobi National Park'], rate: 43 },
-  { name: 'Bwindi', keywords: ['Bwindi'], rate: 40 },
-  { name: 'Volcanoes', keywords: ['Volcanoes'], rate: 1050 }
+  { park: 'Masai Mara', keywords: ['Mara', 'Maasai Mara'], citizenAdult: 2500, citizenChild: 1200, residentAdult: 4500, residentChild: 2000, nonResidentAdult: 200, nonResidentChild: 100, currency: 'USD' as const },
+  { park: 'Serengeti', keywords: ['Serengeti'], citizenAdult: 11800, citizenChild: 2360, residentAdult: 35, residentChild: 10, nonResidentAdult: 83, nonResidentChild: 24, currency: 'USD' as const },
+  { park: 'Ngorongoro', keywords: ['Ngorongoro'], citizenAdult: 11800, citizenChild: 2360, residentAdult: 35, residentChild: 10, nonResidentAdult: 71, nonResidentChild: 24, currency: 'USD' as const },
+  { park: 'Amboseli', keywords: ['Amboseli'], citizenAdult: 860, citizenChild: 215, residentAdult: 1000, residentChild: 500, nonResidentAdult: 100, nonResidentChild: 50, currency: 'USD' as const },
+  { park: 'Lake Nakuru', keywords: ['Nakuru'], citizenAdult: 860, citizenChild: 215, residentAdult: 1000, residentChild: 500, nonResidentAdult: 100, nonResidentChild: 50, currency: 'USD' as const },
+  { park: 'Tarangire', keywords: ['Tarangire'], citizenAdult: 11800, citizenChild: 2360, residentAdult: 25, residentChild: 8, nonResidentAdult: 59, nonResidentChild: 18, currency: 'USD' as const },
+  { park: 'Samburu', keywords: ['Samburu'], citizenAdult: 1000, citizenChild: 500, residentAdult: 1000, residentChild: 500, nonResidentAdult: 70, nonResidentChild: 40, currency: 'USD' as const },
+  { park: 'Tsavo', keywords: ['Tsavo'], citizenAdult: 515, citizenChild: 215, residentAdult: 515, residentChild: 215, nonResidentAdult: 52, nonResidentChild: 35, currency: 'USD' as const },
+  { park: 'Ol Pejeta', keywords: ['Ol Pejeta', 'Sweetwaters'], citizenAdult: 1100, citizenChild: 550, residentAdult: 2200, residentChild: 1100, nonResidentAdult: 90, nonResidentChild: 45, currency: 'USD' as const },
+  { park: 'Nairobi National Park', keywords: ['Nairobi National Park'], citizenAdult: 430, citizenChild: 215, residentAdult: 430, residentChild: 215, nonResidentAdult: 43, nonResidentChild: 22, currency: 'USD' as const },
+  { park: 'Bwindi', keywords: ['Bwindi'], citizenAdult: 250000, citizenChild: 125000, residentAdult: 600, residentChild: 300, nonResidentAdult: 700, nonResidentChild: 350, currency: 'USD' as const },
+  { park: 'Volcanoes', keywords: ['Volcanoes'], citizenAdult: 30000, citizenChild: 15000, residentAdult: 500, residentChild: 250, nonResidentAdult: 1500, nonResidentChild: 750, currency: 'USD' as const }
 ];
 
 const CostingModule: React.FC<CostingModuleProps> = ({ 
@@ -159,7 +159,7 @@ const CostingModule: React.FC<CostingModuleProps> = ({
       }
 
       const ai = new GoogleGenAI({ apiKey });
-      const modelId = 'gemini-1.5-flash';
+      const modelId = 'gemini-3-flash-preview';
 
       const prompt = `
         You are an expert safari operations assistant. 
@@ -302,23 +302,51 @@ const CostingModule: React.FC<CostingModuleProps> = ({
         });
       }
 
-      const dayContext = `${day.title} ${day.description} ${day.accommodation}`.toLowerCase();
+      const dayContext = `${day.title} ${day.description} ${day.accommodation} ${day.morningActivity} ${day.afternoonActivity}`.toLowerCase();
       const parks = branding?.parkFees || KNOWN_PARKS;
-      const matchedPark = parks.find(park => 
-        park.keywords.some(keyword => dayContext.includes(keyword.toLowerCase()))
+      const matchedPark = (parks as any[]).find(park => 
+        (park.keywords || [(park.park || park.name)]).some((keyword: string) => dayContext.includes(keyword.toLowerCase()))
       );
 
       if (matchedPark) {
         if (!dayContext.includes('airport transfer only') && !dayContext.includes('departure')) {
-           newItems.push({
-            id: crypto.randomUUID(),
-            type: 'Fee',
-            description: `Park Fee: ${matchedPark.name} - Day ${day.day}`,
-            quantity: totalPax, 
-            unitPrice: matchedPark.rate,
-            total: totalPax * matchedPark.rate,
-            dayRef: day.day
-          });
+          const status = formData.travelerStatus || 'non-resident';
+          const kesRate = branding?.kesToUsdRate || 130;
+          
+          let adultFee = 0;
+          let childFee = 0;
+          const isUSD = matchedPark.currency === 'USD';
+
+          if (status === 'citizen') {
+            adultFee = matchedPark.citizenAdult || (matchedPark as any).citizen || 0;
+            childFee = matchedPark.citizenChild || 0;
+          } else if (status === 'resident') {
+            adultFee = matchedPark.residentAdult || (matchedPark as any).resident || 0;
+            childFee = matchedPark.residentChild || 0;
+          } else {
+            adultFee = matchedPark.nonResidentAdult || (matchedPark as any).non_resident || matchedPark.rate || 0;
+            childFee = matchedPark.nonResidentChild || (matchedPark.rate ? matchedPark.rate / 2 : 0);
+          }
+
+          // Convert KES to USD if needed
+          if (!isUSD) {
+            adultFee = adultFee / kesRate;
+            childFee = childFee / kesRate;
+          }
+
+          const totalParkCost = ((formData.adults + formData.youngAdults) * adultFee) + (formData.children * childFee);
+
+          if (totalParkCost > 0) {
+            newItems.push({
+              id: crypto.randomUUID(),
+              type: 'Fee',
+              description: `Park Fee: ${matchedPark.park || matchedPark.name} (${status.toUpperCase()}) - Day ${day.day}`,
+              quantity: 1, 
+              unitPrice: totalParkCost,
+              total: totalParkCost,
+              dayRef: day.day
+            });
+          }
         }
       }
     });
@@ -326,7 +354,7 @@ const CostingModule: React.FC<CostingModuleProps> = ({
     initialExtractionDone.current = true;
     setProjectItems(newItems);
     setIsAutoCalculating(false);
-  }, [itinerary, formData, lodges, customRates, isAutoCalculating, branding?.parkFees]);
+  }, [itinerary, formData, lodges, customRates, isAutoCalculating, branding?.parkFees, branding?.kesToUsdRate]);
 
 
   // --- AUTO ITEMS EFFECT (SRS + Transport) ---

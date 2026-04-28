@@ -107,7 +107,19 @@ export interface BrandingConfig {
   statistics?: { label: string; value: string; iconType: 'heart' | 'globe' | 'shield' | 'award' | 'users' | 'star' }[];
   socialLinks?: { platform: string; url: string }[];
   globalPartners?: PartnerLogo[];
-  parkFees?: { name: string; keywords: string[]; rate: number }[];
+  parkFees?: { 
+    id: string;
+    park: string; 
+    keywords: string[]; 
+    citizenAdult: number;
+    citizenChild: number;
+    residentAdult: number;
+    residentChild: number;
+    nonResidentAdult: number;
+    nonResidentChild: number;
+    currency: 'USD' | 'KES';
+  }[];
+  kesToUsdRate?: number;
   transportRates?: { type: string; dailyRate: number }[];
   defaultMarkup?: number;
   defaultTax?: number;
@@ -208,6 +220,7 @@ export interface SafariFormData {
   destinations: string[];
   customDestinations: string;
   budget: BudgetTier;
+  travelerStatus?: 'citizen' | 'resident' | 'non-resident';
   activities: string[];
   preferredAccommodations: string[];
   otherAccommodations: string;

@@ -365,7 +365,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
   const fetchLodges = useCallback(async () => {
     setIsLodgesLoading(true);
-    let query = supabase.from('lodges').select('*');
+    const query = supabase.from('lodges').select('*');
     try {
       const { data, error } = await query
         .order('created_at', { ascending: false });
@@ -2589,7 +2589,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
                   <div className="pt-8 border-t border-safari-50">
                     <h4 className="text-[10px] font-black uppercase text-safari-400 mb-6 tracking-widest">Financial & Rates Configuration</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
                       <div className="space-y-2">
                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Global Markup (%)</label>
                          <input 
@@ -2608,6 +2608,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                            onChange={(e) => setBranding({...branding, defaultTax: Number(e.target.value)})}
                          />
                       </div>
+                      <div className="space-y-2">
+                         <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">KES to USD Rate (1 USD = X KES)</label>
+                         <input 
+                           type="number" 
+                           className="w-full p-4 bg-safari-50 border border-safari-100 rounded-lg font-bold text-xl text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20 shadow-sm" 
+                           value={branding.kesToUsdRate || 130}
+                           onChange={(e) => setBranding({...branding, kesToUsdRate: Number(e.target.value)})}
+                         />
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -2617,79 +2626,165 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                           <button 
                             onClick={() => setBranding({
                               ...branding, 
-                              parkFees: [...(branding.parkFees || []), { park: '', citizen: 0, resident: 0, non_resident: 0 }]
+                              parkFees: [...(branding.parkFees || []), { 
+                                id: crypto.randomUUID(), 
+                                park: '', 
+                                keywords: [], 
+                                citizenAdult: 0, 
+                                citizenChild: 0, 
+                                residentAdult: 0, 
+                                residentChild: 0, 
+                                nonResidentAdult: 0, 
+                                nonResidentChild: 0, 
+                                currency: 'USD' 
+                              }]
                             })}
                             className="text-[10px] font-black uppercase text-safari-600 hover:text-safari-900 flex items-center gap-1 bg-safari-50 px-2 py-1 rounded-md border border-safari-100 shadow-sm"
                           >
                             <Plus size={12} /> Add Park
                           </button>
                         </div>
-                        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 no-scrollbar">
+                        <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2 no-scrollbar">
                           {(branding.parkFees || []).map((fee, idx) => (
-                            <div key={idx} className="p-4 bg-white border border-safari-100 rounded-lg shadow-sm space-y-3 animate-fadeIn relative group">
+                            <div key={fee.id || idx} className="p-4 bg-white border border-safari-100 rounded-lg shadow-sm space-y-4 animate-fadeIn relative group">
                               <button 
                                 onClick={() => {
                                   const newList = [...(branding.parkFees || [])];
                                   newList.splice(idx, 1);
                                   setBranding({ ...branding, parkFees: newList });
                                 }}
-                                className="absolute top-2 right-2 text-safari-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                className="absolute top-2 right-2 text-safari-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 z-10"
                               >
                                 <Trash2 size={14} />
                               </button>
-                              <div className="space-y-1">
-                                <label className="text-[9px] font-bold text-safari-400 uppercase tracking-tighter">Park Name</label>
-                                <input 
-                                  type="text" 
-                                  className="w-full p-2 bg-safari-50 border border-safari-100 rounded font-bold text-sm text-safari-900 outline-none" 
-                                  value={fee.park}
-                                  onChange={(e) => {
-                                    const newList = [...(branding.parkFees || [])];
-                                    newList[idx] = { ...fee, park: e.target.value };
-                                    setBranding({ ...branding, parkFees: newList });
-                                  }}
-                                  placeholder="e.g. Masai Mara"
-                                />
+
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-bold text-safari-400 uppercase tracking-tighter">Park Name</label>
+                                  <input 
+                                    type="text" 
+                                    className="w-full p-2 bg-safari-50 border border-safari-100 rounded font-bold text-sm text-safari-900 outline-none" 
+                                    value={fee.park}
+                                    onChange={(e) => {
+                                      const newList = [...(branding.parkFees || [])];
+                                      newList[idx] = { ...fee, park: e.target.value, keywords: [e.target.value] };
+                                      setBranding({ ...branding, parkFees: newList });
+                                    }}
+                                    placeholder="e.g. Masai Mara"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-bold text-safari-400 uppercase tracking-tighter">Currency</label>
+                                  <select 
+                                    className="w-full p-2 bg-safari-50 border border-safari-100 rounded font-bold text-sm text-safari-900 outline-none cursor-pointer"
+                                    value={fee.currency}
+                                    onChange={(e) => {
+                                      const newList = [...(branding.parkFees || [])];
+                                      newList[idx] = { ...fee, currency: e.target.value as 'USD' | 'KES' };
+                                      setBranding({ ...branding, parkFees: newList });
+                                    }}
+                                  >
+                                    <option value="USD">USD ($)</option>
+                                    <option value="KES">KES (Shillings)</option>
+                                  </select>
+                                </div>
                               </div>
-                              <div className="grid grid-cols-3 gap-2">
-                                <div className="space-y-1">
-                                  <label className="text-[9px] font-bold text-safari-400 uppercase tracking-tighter">Citizen</label>
-                                  <input 
-                                    type="number" 
-                                    className="w-full p-2 bg-safari-50 border border-safari-100 rounded font-bold text-sm text-safari-900 outline-none" 
-                                    value={fee.citizen}
-                                    onChange={(e) => {
-                                      const newList = [...(branding.parkFees || [])];
-                                      newList[idx] = { ...fee, citizen: Number(e.target.value) };
-                                      setBranding({ ...branding, parkFees: newList });
-                                    }}
-                                  />
+
+                              <div className="grid grid-cols-3 gap-3">
+                                <div className="space-y-2 p-2 bg-safari-50/50 rounded-lg">
+                                  <label className="text-[9px] font-black text-safari-600 uppercase block border-b border-safari-100 pb-1">Citizen</label>
+                                  <div className="space-y-2">
+                                    <div className="space-y-0.5">
+                                      <label className="text-[8px] font-bold text-safari-400">Adult</label>
+                                      <input 
+                                        type="number" 
+                                        className="w-full p-1.5 bg-white border border-safari-100 rounded font-bold text-xs" 
+                                        value={fee.citizenAdult || (fee as any).citizen || 0}
+                                        onChange={(e) => {
+                                          const newList = [...(branding.parkFees || [])];
+                                          newList[idx] = { ...fee, citizenAdult: Number(e.target.value) };
+                                          setBranding({ ...branding, parkFees: newList });
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                      <label className="text-[8px] font-bold text-safari-400">Child</label>
+                                      <input 
+                                        type="number" 
+                                        className="w-full p-1.5 bg-white border border-safari-100 rounded font-bold text-xs" 
+                                        value={fee.citizenChild || 0}
+                                        onChange={(e) => {
+                                          const newList = [...(branding.parkFees || [])];
+                                          newList[idx] = { ...fee, citizenChild: Number(e.target.value) };
+                                          setBranding({ ...branding, parkFees: newList });
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="space-y-1">
-                                  <label className="text-[9px] font-bold text-safari-400 uppercase tracking-tighter">Resident</label>
-                                  <input 
-                                    type="number" 
-                                    className="w-full p-2 bg-safari-50 border border-safari-100 rounded font-bold text-sm text-safari-900 outline-none" 
-                                    value={fee.resident}
-                                    onChange={(e) => {
-                                      const newList = [...(branding.parkFees || [])];
-                                      newList[idx] = { ...fee, resident: Number(e.target.value) };
-                                      setBranding({ ...branding, parkFees: newList });
-                                    }}
-                                  />
+
+                                <div className="space-y-2 p-2 bg-safari-50/50 rounded-lg">
+                                  <label className="text-[9px] font-black text-safari-600 uppercase block border-b border-safari-100 pb-1">Resident</label>
+                                  <div className="space-y-2">
+                                    <div className="space-y-0.5">
+                                      <label className="text-[8px] font-bold text-safari-400">Adult</label>
+                                      <input 
+                                        type="number" 
+                                        className="w-full p-1.5 bg-white border border-safari-100 rounded font-bold text-xs" 
+                                        value={fee.residentAdult || (fee as any).resident || 0}
+                                        onChange={(e) => {
+                                          const newList = [...(branding.parkFees || [])];
+                                          newList[idx] = { ...fee, residentAdult: Number(e.target.value) };
+                                          setBranding({ ...branding, parkFees: newList });
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                      <label className="text-[8px] font-bold text-safari-400">Child</label>
+                                      <input 
+                                        type="number" 
+                                        className="w-full p-1.5 bg-white border border-safari-100 rounded font-bold text-xs" 
+                                        value={fee.residentChild || 0}
+                                        onChange={(e) => {
+                                          const newList = [...(branding.parkFees || [])];
+                                          newList[idx] = { ...fee, residentChild: Number(e.target.value) };
+                                          setBranding({ ...branding, parkFees: newList });
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="space-y-1">
-                                  <label className="text-[9px] font-bold text-safari-400 uppercase tracking-tighter">Non-Res</label>
-                                  <input 
-                                    type="number" 
-                                    className="w-full p-2 bg-safari-50 border border-safari-100 rounded font-bold text-sm text-safari-900 outline-none" 
-                                    value={fee.non_resident}
-                                    onChange={(e) => {
-                                      const newList = [...(branding.parkFees || [])];
-                                      newList[idx] = { ...fee, non_resident: Number(e.target.value) };
-                                      setBranding({ ...branding, parkFees: newList });
-                                    }}
-                                  />
+
+                                <div className="space-y-2 p-2 bg-safari-50/50 rounded-lg">
+                                  <label className="text-[9px] font-black text-safari-600 uppercase block border-b border-safari-100 pb-1">Non-Res</label>
+                                  <div className="space-y-2">
+                                    <div className="space-y-0.5">
+                                      <label className="text-[8px] font-bold text-safari-400">Adult</label>
+                                      <input 
+                                        type="number" 
+                                        className="w-full p-1.5 bg-white border border-safari-100 rounded font-bold text-xs" 
+                                        value={fee.nonResidentAdult || (fee as any).non_resident || 0}
+                                        onChange={(e) => {
+                                          const newList = [...(branding.parkFees || [])];
+                                          newList[idx] = { ...fee, nonResidentAdult: Number(e.target.value) };
+                                          setBranding({ ...branding, parkFees: newList });
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="space-y-0.5">
+                                      <label className="text-[8px] font-bold text-safari-400">Child</label>
+                                      <input 
+                                        type="number" 
+                                        className="w-full p-1.5 bg-white border border-safari-100 rounded font-bold text-xs" 
+                                        value={fee.nonResidentChild || 0}
+                                        onChange={(e) => {
+                                          const newList = [...(branding.parkFees || [])];
+                                          newList[idx] = { ...fee, nonResidentChild: Number(e.target.value) };
+                                          setBranding({ ...branding, parkFees: newList });
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             </div>

@@ -37,6 +37,7 @@ const DEFAULT_DATA: SafariFormData = {
   destinations: [],
   customDestinations: '',
   budget: BudgetTier.MidRange,
+  travelerStatus: 'non-resident',
   activities: [],
   preferredAccommodations: [],
   otherAccommodations: '',
@@ -244,6 +245,24 @@ const SafariForm: React.FC<SafariFormProps> = ({ onSubmit, isLoading, initialDat
                   value={formData.startDate}
                   onChange={(e) => updateField('startDate', e.target.value)}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-safari-700 mb-1">Traveler Residency Status</label>
+                <div className="relative">
+                  <select
+                    className="w-full p-3 border border-safari-300 rounded focus:ring-2 focus:ring-safari-500 outline-none bg-white text-safari-900 font-medium appearance-none cursor-pointer"
+                    value={formData.travelerStatus}
+                    onChange={(e) => updateField('travelerStatus', e.target.value)}
+                  >
+                    <option value="non-resident">Non-Resident (International)</option>
+                    <option value="resident">Resident (East Africa Resident)</option>
+                    <option value="citizen">Citizen (East Africa Citizen)</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-safari-900">
+                    <ChevronDown size={20} />
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -562,7 +581,9 @@ const SafariForm: React.FC<SafariFormProps> = ({ onSubmit, isLoading, initialDat
             <div className="bg-white p-8 rounded-lg border border-safari-200 text-sm space-y-4 shadow-lg">
               <div className="flex justify-between border-b border-safari-100 pb-3">
                 <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px]">Traveler</span>
-                <span className="font-extrabold text-safari-900">{formData.name} from {formData.country}</span>
+                <span className="font-extrabold text-safari-900">
+                  {formData.name} ({formData.travelerStatus?.toUpperCase()}) from {formData.country}
+                </span>
               </div>
                <div className="flex justify-between border-b border-safari-100 pb-3">
                 <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px]">Email</span>
