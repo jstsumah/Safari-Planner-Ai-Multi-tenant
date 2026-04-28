@@ -795,71 +795,179 @@ const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Footer */}
-      <footer className="bg-safari-900 text-white pt-20 pb-8 border-t border-safari-800">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12">
-          <div className="col-span-1 md:col-span-2 space-y-6">
-            <div className="flex items-center gap-2">
-              <Compass className="text-safari-400" size={32} />
-              <span className="text-xl font-extrabold tracking-tight text-white">
-                {branding.agencyName ? (
-                  <>
-                    {branding.agencyName?.split('.')[0]}
-                    <span className="text-safari-400">.{branding.agencyName?.split('.')[1] || 'ai'}</span>
-                  </>
+      <footer className="bg-safari-950 text-white pt-24 pb-12 relative overflow-hidden">
+        {/* Decorative Background Elements */}
+        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-safari-500/30 to-transparent" />
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-safari-600/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-safari-600/5 rounded-full blur-3xl" />
+
+        <div className="max-w-7xl mx-auto px-6 relative">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 pb-20">
+            
+            {/* Column 1: Brand & Description */}
+            <div className="col-span-1 md:col-span-2 lg:col-span-1 space-y-8">
+              <div className="flex items-center gap-3 group">
+                <div className="w-12 h-12 bg-safari-500/10 rounded-xl flex items-center justify-center border border-safari-500/20 group-hover:border-safari-400 group-hover:bg-safari-500/20 transition-all duration-300">
+                  <Compass className="text-safari-400 group-hover:scale-110 transition-transform" size={28} />
+                </div>
+                <span className="text-2xl font-black tracking-tighter text-white">
+                  {branding.agencyName ? (
+                    <>
+                      {branding.agencyName?.split('.')[0]}
+                      <span className="text-safari-400">.{branding.agencyName?.split('.')[1] || 'ai'}</span>
+                    </>
+                  ) : (
+                    <>Safari<span className="text-safari-400">Planner.ai</span></>
+                  )}
+                </span>
+              </div>
+              <p className="text-safari-300/80 text-sm leading-relaxed max-w-xs font-medium">
+                {branding.agencyDescription || "Empowering Safari Travelers and Agencies through intelligent logistics and modern financial tools. Built for the connoisseurs of the wild and seekers of adventure."}
+              </p>
+              <div className="flex gap-4">
+                {branding.socialLinks && branding.socialLinks.length > 0 ? (
+                  branding.socialLinks.map((link, idx) => {
+                    const Icon = link.platform === 'Globe' ? Globe : link.platform === 'ShieldCheck' ? ShieldCheck : Globe;
+                    return (
+                      <a 
+                        key={idx} 
+                        href={link.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-safari-400 hover:bg-safari-500 hover:text-white hover:border-safari-500 transition-all duration-300"
+                      >
+                        <Icon size={18} />
+                      </a>
+                    );
+                  })
                 ) : (
-                  <>Safari<span className="text-safari-400">Planner.ai</span></>
+                  <>
+                    <a href="#" className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-safari-400 hover:bg-safari-500 hover:text-white hover:border-safari-500 transition-all duration-300">
+                      <Globe size={18} />
+                    </a>
+                    <a href="#" className="w-10 h-10 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-safari-400 hover:bg-safari-500 hover:text-white hover:border-safari-500 transition-all duration-300">
+                      <ShieldCheck size={18} />
+                    </a>
+                  </>
                 )}
-              </span>
+              </div>
             </div>
-            <p className="text-safari-300 text-sm max-w-sm font-medium">
-              {branding.agencyDescription || "Empowering Safari Travelers and Agencies through intelligent logistics and modern financial tools. Built for the connoisseurs of the wild."}
-            </p>
-          </div>
-          <div>
-            <h5 className="font-bold uppercase text-sm tracking-widest text-white mb-6">Product</h5>
-            <ul className="space-y-4 text-sm font-bold text-safari-300">
-              <li className="flex items-center gap-2"><span className="w-1 h-1 bg-safari-500 rounded-full shrink-0" /> <button onClick={onStart} className="hover:text-white transition-colors">Planning Hub</button></li>
-              <li className="flex items-center gap-2"><span className="w-1 h-1 bg-safari-500 rounded-full shrink-0" /> <button onClick={onAdmin} className="hover:text-white transition-colors">Partner Dashboard</button></li>
-              <li className="flex items-center gap-2"><span className="w-1 h-1 bg-safari-500 rounded-full shrink-0" /> <button onClick={onViewPartners} className="hover:text-white transition-colors">Our Partners</button></li>
-              <li className="flex items-center gap-2"><span className="w-1 h-1 bg-safari-500 rounded-full shrink-0" /> <button onClick={onViewProfile} className="hover:text-white transition-colors font-bold text-safari-400">Agency Reputation</button></li>
-              <li className="flex items-center gap-2"><span className="w-1 h-1 bg-safari-500 rounded-full shrink-0" /> <button onClick={onCalculator} className="hover:text-white transition-colors">Cost Estimator</button></li>
-              <li className="flex items-center gap-2"><span className="w-1 h-1 bg-safari-500 rounded-full shrink-0" /> <button className="hover:text-white transition-colors">Itineraries</button></li>
-            </ul>
-          </div>
-          <div>
-            <h5 className="font-bold uppercase text-sm tracking-widest text-white mb-6">Legal</h5>
-            <ul className="space-y-4 text-sm font-bold text-safari-300">
-              <li className="flex items-center gap-2"><span className="w-1 h-1 bg-safari-500 rounded-full shrink-0" /> <a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
-              <li className="flex items-center gap-2"><span className="w-1 h-1 bg-safari-500 rounded-full shrink-0" /> <a href="#" className="hover:text-white transition-colors">Terms of Use</a></li>
-            </ul>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-6 mt-20 pt-8 border-t border-safari-800 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-[10px] font-bold uppercase text-safari-400 tracking-widest">
-            © {new Date().getFullYear()} {branding.agencyName || "SafariPlanner.ai"} • Powered by Intelligence, Crafted by Humans
-          </p>
-          <div className="flex items-center gap-6">
-            <DatabaseStatus />
-            <div className="flex gap-6">
-              {branding.socialLinks && branding.socialLinks.length > 0 ? (
-              branding.socialLinks.map((link, idx) => {
-                const Icon = link.platform === 'Globe' ? Globe : link.platform === 'ShieldCheck' ? ShieldCheck : Globe;
-                return (
-                  <a key={idx} href={link.url} target="_blank" rel="noopener noreferrer" className="text-safari-400 hover:text-white transition-colors">
-                    <Icon size={20} />
+
+            {/* Column 2: Exploration Hub */}
+            <div>
+              <h5 className="font-black uppercase text-[11px] tracking-[0.2em] text-white/40 mb-8 flex items-center gap-2">
+                <span className="w-4 h-px bg-safari-500" /> Exploration Hub
+              </h5>
+              <ul className="space-y-4">
+                <li>
+                  <button onClick={onStart} className="text-safari-300 hover:text-white font-bold text-sm transition-all hover:translate-x-1 flex items-center gap-2 group text-left">
+                    <ChevronRight size={14} className="text-safari-500 opacity-0 group-hover:opacity-100 -ml-4 group-hover:ml-0 transition-all" />
+                    Planning Hub
+                  </button>
+                </li>
+                <li>
+                  <button onClick={onCalculator} className="text-safari-300 hover:text-white font-bold text-sm transition-all hover:translate-x-1 flex items-center gap-2 group text-left">
+                    <ChevronRight size={14} className="text-safari-500 opacity-0 group-hover:opacity-100 -ml-4 group-hover:ml-0 transition-all" />
+                    Cost Estimator
+                  </button>
+                </li>
+                <li>
+                  <button onClick={onViewPartners} className="text-safari-300 hover:text-white font-bold text-sm transition-all hover:translate-x-1 flex items-center gap-2 group text-left">
+                    <ChevronRight size={14} className="text-safari-500 opacity-0 group-hover:opacity-100 -ml-4 group-hover:ml-0 transition-all" />
+                    Partner Network
+                  </button>
+                </li>
+                <li>
+                  <button className="text-safari-300 hover:text-white font-bold text-sm transition-all hover:translate-x-1 flex items-center gap-2 group italic text-left">
+                    <ChevronRight size={14} className="text-safari-500 opacity-0 group-hover:opacity-100 -ml-4 group-hover:ml-0 transition-all" />
+                    Featured Itineraries
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 3: Partner Resources */}
+            <div>
+              <h5 className="font-black uppercase text-[11px] tracking-[0.2em] text-white/40 mb-8 flex items-center gap-2">
+                <span className="w-4 h-px bg-safari-500" /> Professionals
+              </h5>
+              <ul className="space-y-4">
+                <li>
+                  <button onClick={onAdmin} className="text-safari-300 hover:text-white font-bold text-sm transition-all hover:translate-x-1 flex items-center gap-2 group text-left">
+                    <ChevronRight size={14} className="text-safari-500 opacity-0 group-hover:opacity-100 -ml-4 group-hover:ml-0 transition-all" />
+                    Partner Dashboard
+                  </button>
+                </li>
+                <li>
+                  <button onClick={onViewProfile} className="text-safari-400 hover:text-white font-black text-sm transition-all hover:translate-x-1 flex items-center gap-2 group text-left">
+                    <ChevronRight size={14} className="text-safari-500 opacity-0 group-hover:opacity-100 -ml-4 group-hover:ml-0 transition-all font-black" />
+                    Agency Reputation
+                  </button>
+                </li>
+                <li>
+                  <a href="#" className="text-safari-300 hover:text-white font-bold text-sm transition-all hover:translate-x-1 flex items-center gap-2 group">
+                    <ChevronRight size={14} className="text-safari-500 opacity-0 group-hover:opacity-100 -ml-4 group-hover:ml-0 transition-all" />
+                    Support Center
                   </a>
-                );
-              })
-            ) : (
-              <>
-                <Globe className="text-safari-400" size={20} />
-                <ShieldCheck className="text-safari-400" size={20} />
-              </>
-            )}
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 4: Contact & Newsletter */}
+            <div className="space-y-8">
+              <div>
+                <h5 className="font-black uppercase text-[11px] tracking-[0.2em] text-white/40 mb-8 flex items-center gap-2">
+                  <span className="w-4 h-px bg-safari-500" /> Get in Touch
+                </h5>
+                <div className="space-y-4">
+                  <div className="flex items-start gap-4 group">
+                    <div className="w-8 h-8 rounded-lg bg-safari-500/10 border border-safari-500/20 flex items-center justify-center shrink-0 group-hover:bg-safari-500 group-hover:text-white transition-all">
+                      <Mail size={14} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-safari-500 mb-0.5">Email Us</p>
+                      <p className="text-sm font-bold text-white">hello@safariplanner.ai</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4 group">
+                    <div className="w-8 h-8 rounded-lg bg-safari-500/10 border border-safari-500/20 flex items-center justify-center shrink-0 group-hover:bg-safari-500 group-hover:text-white transition-all">
+                      <MapPin size={14} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-safari-500 mb-0.5">Base Camp</p>
+                      <p className="text-sm font-bold text-white">Nairobi, Kenya</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Bar */}
+          <div className="pt-12 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-8 md:gap-4">
+            <div className="flex flex-col md:flex-row items-center gap-4 md:gap-8 order-2 md:order-1">
+              <p className="text-[10px] font-black uppercase text-safari-500/60 tracking-[0.2em] text-center md:text-left">
+                © {new Date().getFullYear()} {branding.agencyName || "SafariPlanner.ai"} 
+                <span className="mx-3 opacity-30">|</span> 
+                Intelligence in the Wild
+              </p>
+              <div className="flex items-center gap-6">
+                <a href="#" className="text-[10px] font-black uppercase text-safari-500/40 hover:text-safari-400 tracking-widest transition-colors">Privacy</a>
+                <a href="#" className="text-[10px] font-black uppercase text-safari-500/40 hover:text-safari-400 tracking-widest transition-colors">Terms</a>
+              </div>
+            </div>
+            
+            <div className="order-1 md:order-2 flex items-center gap-6 bg-white/5 px-6 py-3 rounded-2xl border border-white/5">
+              <DatabaseStatus />
+              <div className="w-px h-4 bg-white/10" />
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-[9px] font-black uppercase tracking-widest text-safari-400">System Nominal</span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </footer>
+      </footer>
     </div>
   );
 };

@@ -99,7 +99,7 @@ const PartnersPage: React.FC<PartnersPageProps> = ({ onBack, onViewProfile, bran
             <input 
               type="text"
               placeholder="Search by agency name, location, or expertise..."
-              className="w-full pl-14 pr-6 py-5 bg-white border border-safari-200 rounded-2xl shadow-xl shadow-safari-900/5 focus:border-safari-500 outline-none transition-all font-bold text-safari-900"
+              className="w-full pl-14 pr-6 py-5 bg-white border border-safari-200 rounded-xl shadow-xl shadow-safari-900/5 focus:border-safari-500 outline-none transition-all font-bold text-safari-900"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -116,7 +116,7 @@ const PartnersPage: React.FC<PartnersPageProps> = ({ onBack, onViewProfile, bran
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[1,2,3,4,5,6].map(i => (
-              <div key={i} className="bg-white h-96 rounded-[2.5rem] border border-safari-100 animate-pulse" />
+              <div key={i} className="bg-white h-96 rounded-2xl border border-safari-100 animate-pulse" />
             ))}
           </div>
         ) : filteredCompanies.length > 0 ? (
@@ -124,15 +124,15 @@ const PartnersPage: React.FC<PartnersPageProps> = ({ onBack, onViewProfile, bran
             {filteredCompanies.map((company) => (
               <div 
                 key={company.id}
-                className="group bg-white rounded-[2.5rem] p-8 border border-safari-100 hover:shadow-2xl hover:shadow-safari-900/10 transition-all duration-300 relative flex flex-col justify-between overflow-hidden"
+                className="group bg-white rounded-2xl p-8 border border-safari-100 hover:shadow-2xl hover:shadow-safari-900/10 transition-all duration-300 relative flex flex-col justify-between overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-safari-50 rounded-bl-full pointer-events-none -mr-16 -mt-16 group-hover:bg-safari-100 transition-colors" />
                 
                 <div className="space-y-6 relative">
                   <div className="flex items-start justify-between">
-                    <div className="w-16 h-16 bg-safari-50 rounded-2xl flex items-center justify-center text-safari-600 shadow-sm border border-safari-100 group-hover:scale-110 transition-transform">
+                    <div className="w-16 h-16 bg-safari-50 rounded-xl flex items-center justify-center text-safari-600 shadow-sm border border-safari-100 group-hover:scale-110 transition-transform">
                       {company.branding?.heroImage ? (
-                        <div className="w-12 h-12 rounded-xl overflow-hidden">
+                        <div className="w-12 h-12 rounded-lg overflow-hidden">
                           <img src={company.branding.heroImage} className="w-full h-full object-cover" alt="" />
                         </div>
                       ) : (
@@ -167,7 +167,7 @@ const PartnersPage: React.FC<PartnersPageProps> = ({ onBack, onViewProfile, bran
                 <div className="pt-8 mt-8 border-t border-safari-50 relative">
                   <button 
                     onClick={() => onViewProfile(company.id, company.branding || branding)}
-                    className="w-full py-4 bg-safari-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-safari-800 transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg shadow-safari-900/10 group/btn"
+                    className="w-full py-4 bg-safari-900 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-safari-800 transition-all flex items-center justify-center gap-3 active:scale-95 shadow-lg shadow-safari-900/10 group/btn"
                   >
                     View Company Profile <ArrowRight size={16} className="group-hover/btn:translate-x-1 transition-transform" />
                   </button>
@@ -194,7 +194,7 @@ const PartnersPage: React.FC<PartnersPageProps> = ({ onBack, onViewProfile, bran
         )}
 
         {/* Footer info */}
-        <section className="bg-safari-900 rounded-[3rem] p-12 text-white overflow-hidden relative">
+        <section className="bg-safari-900 rounded-3xl p-12 text-white overflow-hidden relative">
           <div className="absolute bottom-0 right-0 w-96 h-96 bg-safari-800 rounded-tl-full -mr-32 -mb-32 opacity-30" />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center relative">
             <div className="space-y-6">
@@ -206,7 +206,7 @@ const PartnersPage: React.FC<PartnersPageProps> = ({ onBack, onViewProfile, bran
                 Join the network of the continent's most modern operators. Scale your operations with our AI-assisted logistic engine and provide expert branding to your clients.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <button className="bg-white text-safari-900 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-safari-100 transition-all flex items-center justify-center gap-2 shadow-xl">
+                <button className="bg-white text-safari-900 px-8 py-4 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-safari-100 transition-all flex items-center justify-center gap-2 shadow-xl">
                   Register Your Agency <ArrowRight size={16} />
                 </button>
                 <div className="flex items-center gap-4 px-6 text-safari-400 font-bold text-sm">

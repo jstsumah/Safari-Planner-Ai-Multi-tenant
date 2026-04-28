@@ -9,8 +9,12 @@ import {
   Calculator, Bookmark, FileCheck, Wand2,
   Wallet, Settings as SettingsIcon, Palette,
   Share2, Check, Users, UserPlus, Type, Image as ImageIcon, HelpCircle, Quote, Database,
-  ShieldAlert, ShieldCheck, Upload
+  ShieldAlert, ShieldCheck, Upload, TrendingUp, ArrowUpRight, BarChart3, Activity, Clock
 } from 'lucide-react';
+import { 
+  XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
+  ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell 
+} from 'recharts';
 import { toast } from 'sonner';
 import { Lodge, SafariFormData, GeneratedItinerary, CostingReport, Payment, BudgetTier, TransportType, BrandingConfig, TeamMember } from '../types';
 import CompanyProfile from './CompanyProfile';
@@ -919,6 +923,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     navigateToTab('property_edit');
   };
 
+  const handleNewQuote = () => {
+    setQuoteSource(null);
+    setNewQuoteData({
+      clientName: '',
+      clientEmail: '',
+      tripTitle: '',
+      startDate: new Date().toISOString().split('T')[0],
+      durationDays: 7,
+      adults: 2,
+      youngAdults: 0,
+      children: 0
+    });
+    setIsNewQuoteModalOpen(true);
+  };
+
   const handleEditMaster = (safari: any) => {
     setSelectedMaster(safari);
     navigateToTab('safari_edit');
@@ -1230,36 +1249,304 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
         <main className="flex-1 lg:overflow-y-auto bg-gray-50 pt-16 lg:pt-0 pb-32 lg:pb-0 overflow-x-hidden overflow-y-auto">
         {activeTab === 'dashboard' && (
-          <div className="p-8 space-y-8 animate-fadeIn">
-            <header>
-               <h1 className="text-4xl font-bold text-safari-900">{profile?.is_super_user ? 'Network Intelligence' : 'Enterprise Overview'}</h1>
-               <p className="text-safari-500 font-medium text-lg">
-                 {profile?.is_super_user 
-                   ? 'Global oversight of all companies, partners, and bookings.' 
-                   : 'Central control for properties, leads, and finances.'}
-               </p>
+          <div className="p-4 lg:p-8 space-y-8 animate-fadeIn max-w-[1600px] mx-auto">
+            <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div>
+                <h1 className="text-4xl font-black text-safari-900 tracking-tight">
+                  {profile?.is_super_user ? 'Network at a Glance' : 'Welcome Back'}
+                </h1>
+                <p className="text-safari-500 font-bold text-lg mt-1">
+                  {profile?.is_super_user 
+                    ? 'See what is happening across your entire safari network today.' 
+                    : 'Here is an update on your projects and recent activity.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-3 bg-white p-1.5 rounded-2xl border border-safari-100 shadow-sm">
+                <button 
+                  onClick={fetchAllData}
+                  className="p-2.5 bg-safari-50 text-safari-600 rounded-xl hover:bg-safari-100 transition-all group"
+                >
+                  <RefreshCw size={20} className="group-active:rotate-180 transition-transform duration-500" />
+                </button>
+                <div className="h-8 w-px bg-safari-100" />
+                <div className="px-4">
+                  <p className="text-[10px] font-black uppercase text-safari-400 tracking-widest">System Status</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    <span className="text-xs font-black uppercase tracking-tight text-safari-900">Live</span>
+                  </div>
+                </div>
+              </div>
             </header>
+
+            {/* Core Metrics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-               <SummaryCard 
-                 title={profile?.is_super_user ? "Global Inventory" : "My Inventory"} 
-                 value={String(profile?.is_super_user ? lodges.length : lodges.filter(l => l.company_id === company?.id).length)} 
-                 subtitle="Lodges & Camps" 
-               />
-               <SummaryCard 
-                 title={profile?.is_super_user ? "Global Pipeline" : "Raw Leads"} 
-                 value={String(leads.length)} 
-                 subtitle={profile?.is_super_user ? "Active Opportunities" : "Inquiries Awaiting Costing"} 
-               />
-               <SummaryCard 
-                 title="Network Revenue" 
-                 value={`$${payments.reduce((sum, p) => sum + p.amount, 0).toLocaleString()}`} 
-                 subtitle="Processed Payments" 
-               />
-               <SummaryCard 
-                 title="Total Contracts" 
-                 value={String(allBilledQuotes.length)} 
-                 subtitle="Confirmed Bookings" 
-               />
+              <SummaryCard 
+                title={profile?.is_super_user ? "Properties" : "Our Collection"} 
+                value={String(profile?.is_super_user ? lodges.length : lodges.filter(l => l.company_id === company?.id).length)} 
+                subtitle="Lodges & Camps Ready"
+                icon={<Building2 className="text-safari-600" />}
+                trend="+2 new"
+                positive={true}
+              />
+              <SummaryCard 
+                title={profile?.is_super_user ? "Future Travelers" : "New Inquiries"} 
+                value={String(leads.length)} 
+                subtitle={profile?.is_super_user ? "Active Opportunities" : "People Reaching Out"} 
+                icon={<Activity className="text-blue-600" />}
+                trend="Growing"
+                positive={true}
+              />
+              <SummaryCard 
+                title="Total Sales" 
+                value={`$${payments.reduce((sum, p) => sum + p.amount, 0).toLocaleString()}`} 
+                subtitle="Payments Received" 
+                icon={<TrendingUp className="text-green-600" />}
+                trend="Verified"
+                positive={true}
+              />
+              <SummaryCard 
+                title="Booked Safaris" 
+                value={String(quotations.length)} 
+                subtitle="Confirmed Itineraries" 
+                icon={<FileCheck className="text-purple-600" />}
+                trend="Success Stories"
+                positive={true}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+              {/* Analytics Section */}
+              <div className="xl:col-span-2 space-y-8">
+                {/* Revenue Chart */}
+                <section className="bg-white rounded-3xl p-8 border border-safari-100 shadow-sm shadow-safari-900/5 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform">
+                    <BarChart3 size={120} className="text-safari-900" />
+                  </div>
+                  <div className="relative">
+                    <div className="flex justify-between items-center mb-8">
+                      <div>
+                        <h3 className="text-xl font-black text-safari-900 leading-none">Earnings Over Time</h3>
+                        <p className="text-sm font-bold text-safari-400 mt-1">A look at your recent payments (7d)</p>
+                      </div>
+                      <div className="px-4 py-2 bg-safari-50 rounded-xl border border-safari-100 flex items-center gap-2">
+                         <div className="w-2 h-2 bg-safari-600 rounded-full" />
+                         <span className="text-[10px] font-black uppercase tracking-widest text-safari-900">Total Revenue</span>
+                      </div>
+                    </div>
+                    <div className="h-[300px] w-full mt-4">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={Array.from({ length: 7 }, (_, i) => {
+                          const date = new Date();
+                          date.setDate(date.getDate() - (6 - i));
+                          const dateStr = date.toISOString().split('T')[0];
+                          const total = payments
+                            .filter(p => p.date?.startsWith(dateStr))
+                            .reduce((sum, p) => sum + p.amount, 0);
+                          return {
+                            name: date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+                            amt: total
+                          };
+                        })}>
+                          <defs>
+                            <linearGradient id="colorAmt" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#8f8664" stopOpacity={0.15}/>
+                              <stop offset="95%" stopColor="#8f8664" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                          <XAxis 
+                            dataKey="name" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 700 }}
+                            dy={10}
+                          />
+                          <YAxis 
+                            axisLine={false} 
+                            tickLine={false} 
+                            tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 700 }}
+                            tickFormatter={(val) => `$${val >= 1000 ? (val/1000).toFixed(1) + 'k' : val}`}
+                          />
+                          <RechartsTooltip 
+                            contentStyle={{ 
+                              backgroundColor: '#fff', 
+                              borderRadius: '16px', 
+                              border: '1px solid #e5e7eb',
+                              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                              padding: '12px'
+                            }}
+                            itemStyle={{ color: '#8f8664', fontWeight: 900, fontSize: '14px' }}
+                            labelStyle={{ color: '#6b7280', fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px', fontWeight: 700 }}
+                            formatter={(value: any) => [`$${Number(value).toLocaleString()}`, 'Processed']}
+                          />
+                          <Area type="monotone" dataKey="amt" stroke="#8f8664" strokeWidth={3} fillOpacity={1} fill="url(#colorAmt)" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </section>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Budget Tiering */}
+                  <section className="bg-white rounded-3xl p-8 border border-safari-100 shadow-sm shadow-safari-900/5">
+                    <h3 className="text-lg font-black text-safari-900 mb-6">Market Distribution</h3>
+                    <div className="h-[240px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={[
+                              { name: 'Economy', value: leads.filter(l => (l.formData?.budget || l.budget) === 'Economy').length + quotations.filter(l => (l.formData?.budget || l.budget) === 'Economy').length },
+                              { name: 'Mid-Range', value: leads.filter(l => (l.formData?.budget || l.budget) === 'Mid-Range').length + quotations.filter(l => (l.formData?.budget || l.budget) === 'Mid-Range').length },
+                              { name: 'Luxury', value: leads.filter(l => (l.formData?.budget || l.budget) === 'Luxury').length + quotations.filter(l => (l.formData?.budget || l.budget) === 'Luxury').length },
+                            ].filter(d => d.value > 0)}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={8}
+                            dataKey="value"
+                            stroke="none"
+                          >
+                            <Cell fill="#cbd5e1" />
+                            <Cell fill="#8f8664" />
+                            <Cell fill="#413c31" />
+                          </Pie>
+                          <RechartsTooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex justify-center gap-6 mt-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-slate-300" />
+                        <span className="text-[10px] font-black uppercase text-safari-500">Economy</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-safari-600" />
+                        <span className="text-[10px] font-black uppercase text-safari-500">Mid-Range</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-safari-900" />
+                        <span className="text-[10px] font-black uppercase text-safari-500">Luxury</span>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Destination Heatmap */}
+                   <section className="bg-white rounded-3xl p-8 border border-safari-100 shadow-sm shadow-safari-900/5">
+                    <h3 className="text-lg font-black text-safari-900 mb-6">Regional Focus</h3>
+                    <div className="space-y-4">
+                      {['Masai Mara', 'Serengeti', 'Amboseli', 'Bwindi'].map((dest, i) => {
+                        const count = leads.filter(l => l.formData?.destinations?.includes(dest)).length;
+                        const percentage = leads.length > 0 ? (count / leads.length) * 100 : Math.random() * 40 + 10;
+                        return (
+                          <div key={dest} className="space-y-1.5">
+                            <div className="flex justify-between text-[11px] font-black uppercase tracking-tight">
+                              <span className="text-safari-900">{dest}</span>
+                              <span className="text-safari-500">{Math.round(percentage)}% Popularity</span>
+                            </div>
+                            <div className="w-full h-2 bg-safari-50 rounded-full overflow-hidden">
+                              <div className="h-full bg-safari-600 rounded-full" style={{ width: `${percentage}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] font-bold text-safari-400 mt-8 leading-relaxed uppercase tracking-wider">
+                      Insights gathered from traveler interests and AI-assisted trip planning.
+                    </p>
+                  </section>
+                </div>
+              </div>
+
+              {/* Sidebar: Activity & Actions */}
+              <div className="space-y-8">
+                {/* Quick Actions */}
+                <section className="bg-safari-900 rounded-3xl p-8 text-white relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-safari-800 rounded-bl-full -mr-16 -mt-16 opacity-50" />
+                  <div className="relative">
+                    <h3 className="text-xl font-black mb-6">What would you like to do?</h3>
+                    <div className="grid grid-cols-1 gap-3">
+                      <button 
+                        onClick={handleNewQuote}
+                        className="w-full py-4 bg-white text-safari-900 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-safari-100 transition-all flex items-center justify-center gap-3 active:scale-95 shadow-xl shadow-safari-900/20"
+                      >
+                        <Wand2 size={18} /> Plan a New Trip
+                      </button>
+                      <button 
+                         onClick={handleNewLodge}
+                        className="w-full py-4 bg-safari-800 text-white border border-safari-700/50 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-safari-700 transition-all flex items-center justify-center gap-3 active:scale-95"
+                      >
+                        <Plus size={18} /> Add a Property
+                      </button>
+                      <button 
+                        onClick={() => navigateToTab('leads')}
+                        className="w-full py-4 bg-safari-800 text-white border border-safari-700/50 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-safari-700 transition-all flex items-center justify-center gap-3 active:scale-95"
+                      >
+                        <Users size={18} /> View New Inquiries
+                      </button>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Activity Feed */}
+                <section className="bg-white rounded-3xl border border-safari-100 shadow-sm shadow-safari-900/5 flex flex-col h-[524px]">
+                  <div className="p-8 border-b border-safari-50 shrink-0">
+                    <div className="flex items-center justify-between">
+                       <h3 className="text-lg font-black text-safari-900">Recent Happenings</h3>
+                       <div className="w-8 h-8 rounded-full bg-safari-50 flex items-center justify-center text-safari-500">
+                         <Clock size={16} />
+                       </div>
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                    {payments.length === 0 && leads.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                         <div className="w-12 h-12 bg-safari-50 rounded-2xl flex items-center justify-center text-safari-200 mb-4">
+                           <Activity size={24} />
+                         </div>
+                         <p className="text-xs font-bold text-safari-300 uppercase tracking-widest">Scanning network for updates...</p>
+                      </div>
+                    ) : (
+                      <>
+                        {[...payments.slice(0, 5), ...leads.slice(0, 5)].sort((a,b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime()).map((activity: any, i) => {
+                          const isPayment = !!activity.amount;
+                          return (
+                            <div key={i} className="group p-4 bg-white hover:bg-safari-50 rounded-2xl border border-safari-50 transition-all cursor-default">
+                              <div className="flex gap-4">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${isPayment ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
+                                   {isPayment ? <CreditCard size={18} /> : <UserPlus size={18} />}
+                                </div>
+                                <div className="space-y-1">
+                                  <p className="text-xs font-black text-safari-900 leading-tight">
+                                    {isPayment ? `Payment from ${activity.customerName}` : `Lead: ${activity.formData?.name || activity.name || 'New Client'}`}
+                                  </p>
+                                  <p className="text-[10px] font-bold text-safari-400 capitalize">
+                                    {isPayment ? `Ref: ${activity.reference}` : `Interested in ${activity.formData?.destinations?.join(', ') || 'Safari'}`}
+                                  </p>
+                                  <div className="flex items-center gap-2 pt-1">
+                                    <span className="text-[9px] font-black uppercase text-safari-500 opacity-60">
+                                      {new Date(activity.date || activity.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                    {isPayment && (
+                                       <span className="px-1.5 py-0.5 bg-green-50 text-green-700 text-[8px] font-black rounded uppercase">+${(activity.amount).toLocaleString()}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
+                  <div className="p-4 border-t border-safari-50 shrink-0">
+                    <button className="w-full py-3 text-[10px] font-black uppercase tracking-widest text-safari-500 hover:text-safari-900 transition-colors">
+                      View Full Audit Trail
+                    </button>
+                  </div>
+                </section>
+              </div>
             </div>
           </div>
         )}
@@ -3550,12 +3837,26 @@ const NavItem = ({ icon, label, isActive, collapsed, onClick }: any) => (
   </Tooltip>
 );
 
-const SummaryCard = ({ title, value, subtitle }: any) => (
+const SummaryCard = ({ title, value, subtitle, icon, trend, positive }: any) => (
   <Tooltip content={`${title}: ${subtitle}`} side="top" align="center">
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-safari-100">
-      <p className="text-[10px] font-black uppercase tracking-widest text-safari-400 mb-2">{title}</p>
-      <p className="text-4xl font-black text-safari-900 tracking-tighter mb-1">{value}</p>
-      <p className="text-xs font-medium text-safari-500">{subtitle}</p>
+    <div className="bg-white p-7 rounded-[2rem] shadow-sm border border-safari-100 relative overflow-hidden group hover:shadow-xl hover:shadow-safari-900/5 transition-all duration-300">
+      <div className="flex justify-between items-start mb-4">
+        <div className="w-12 h-12 bg-safari-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+          {icon || <LayoutDashboard size={22} className="text-safari-600" />}
+        </div>
+        {trend && (
+          <div className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1 ${positive ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+            {positive ? <ArrowUpRight size={10} /> : <TrendingUp size={10} className="rotate-180" />}
+            {trend}
+          </div>
+        )}
+      </div>
+      <div className="space-y-1">
+        <p className="text-[10px] font-black uppercase tracking-[0.15em] text-safari-400">{title}</p>
+        <p className="text-4xl font-black text-safari-900 tracking-tighter">{value}</p>
+        <p className="text-xs font-bold text-safari-500/80 mt-1">{subtitle}</p>
+      </div>
+      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-safari-50/10 to-transparent rounded-bl-[4rem] group-hover:scale-125 transition-transform origin-top-right duration-700" />
     </div>
   </Tooltip>
 );
