@@ -14,7 +14,7 @@ import { useAuth } from './hooks/useAuth';
 import { SafariFormData, GeneratedItinerary, Lodge, BudgetTier, TransportType, BrandingConfig } from './types';
 import { generateSafariItinerary } from './services/aiService';
 import { supabase } from './lib/supabase';
-import { Compass, Settings, AlertTriangle, Calculator, Loader2, LogOut } from 'lucide-react';
+import { Compass, Settings, AlertTriangle, Calculator, Loader2, LogOut, Menu, X, Home, User, Briefcase, Calculator as CalcIcon } from 'lucide-react';
 import { Toaster } from 'sonner';
 import { Tooltip } from './components/ui/Tooltip';
 
@@ -184,6 +184,7 @@ const App: React.FC = () => {
   const [systemBranding, setSystemBranding] = useState<BrandingConfig>(DEFAULT_BRANDING);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [viewMode, setViewMode] = useState<'landing' | 'form' | 'itinerary' | 'history' | 'admin' | 'calculator' | 'auth' | 'partners'>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -668,15 +669,17 @@ const App: React.FC = () => {
 
     if (viewMode === 'calculator') {
       return (
-        <div className="min-h-screen bg-safari-50">
+        <div className="min-h-screen bg-safari-50 relative overflow-x-hidden">
           {/* Public Tool Header */}
-          <header className="bg-safari-900 text-white p-4 shadow-lg">
+          <header className="bg-safari-900 text-white p-4 shadow-lg sticky top-0 z-[100]">
             <div className="max-w-6xl mx-auto flex items-center justify-between">
               <div className="flex items-center gap-2 cursor-pointer" onClick={navigateHome}>
                 <Compass className="text-safari-400" size={24} />
                 <span className="font-extrabold text-lg tracking-tight">Safari<span className="text-safari-400">Calculator</span></span>
               </div>
-              <div className="flex items-center gap-4">
+              
+              {/* Desktop Nav */}
+              <div className="hidden lg:flex items-center gap-4">
                 <button 
                   onClick={navigateHome}
                   className="text-xs font-bold text-safari-300 hover:text-white transition-colors bg-white/10 px-4 py-2 rounded-md border border-white/10"
@@ -687,8 +690,56 @@ const App: React.FC = () => {
                   <Calculator size={14} /> Agent Tooling
                 </div>
               </div>
+
+              {/* Mobile Menu Toggle */}
+              <button 
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="lg:hidden p-2 text-safari-400 hover:bg-white/10 rounded-lg transition-colors"
+                aria-label="Toggle Mobile Menu"
+              >
+                {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              </button>
             </div>
           </header>
+
+          {/* Mobile Menu Overlay for Calculator */}
+          {isMobileMenuOpen && (
+            <div className="lg:hidden fixed inset-0 top-[72px] bg-safari-900 z-[95] animate-fadeIn">
+              <div className="p-8 flex flex-col gap-6 font-bold text-safari-200">
+                <button onClick={() => { setIsMobileMenuOpen(false); navigateHome(); }} className="flex items-center gap-3 text-lg py-2 border-b border-white/5">
+                  <Home size={20} className="text-safari-400" /> Return Home
+                </button>
+                <button onClick={() => { setIsMobileMenuOpen(false); setViewMode('form'); }} className="flex items-center gap-3 text-lg py-2 border-b border-white/5">
+                  <Compass size={20} className="text-safari-400" /> Safari Planner
+                </button>
+                {!user ? (
+                  <button 
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setAuthMode('signin');
+                      setAuthType('user');
+                      navigateToView('auth');
+                    }}
+                    className="flex items-center gap-3 text-lg py-2 border-b border-white/5"
+                  >
+                    <User size={20} className="text-safari-400" /> Start Planning
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => { setIsMobileMenuOpen(false); navigateToView('admin'); }}
+                    className="flex items-center gap-3 text-lg py-2 border-b border-white/5"
+                  >
+                    <Briefcase size={20} className="text-safari-400" /> Partner Panel
+                  </button>
+                )}
+                <div className="mt-auto pt-10 flex flex-col gap-4">
+                  <div className="flex items-center gap-2 text-safari-500 text-[10px] font-black uppercase tracking-[0.2em]">
+                    <CalcIcon size={14} /> Powered by SafariPlanner.ai
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <main className="p-4 md:p-8">
             <CostingModule 
@@ -723,58 +774,122 @@ const App: React.FC = () => {
                 )}
               </h1>
             </div>
-                  <div className="flex items-center gap-2 md:gap-4 shrink-0">
-                    <button 
-                      onClick={navigateHome}
-                      className="text-sm font-bold text-safari-600 hover:text-safari-900 px-4 py-2 hover:bg-safari-50 rounded-lg transition-all"
-                    >
-                      Home
-                    </button>
-                    {!user && (
+            
+            {/* Desktop Navigation */}
+            <div className="hidden lg:flex items-center gap-2 md:gap-4 shrink-0">
+              <button 
+                onClick={navigateHome}
+                className="text-sm font-bold text-safari-600 hover:text-safari-900 px-4 py-2 hover:bg-safari-50 rounded-lg transition-all"
+              >
+                Home
+              </button>
+              {!user && (
+                <button 
+                  onClick={() => {
+                    setAuthMode('signin');
+                    setAuthType('user');
+                    navigateToView('auth');
+                  }}
+                  className="text-sm font-bold text-safari-600 hover:text-safari-900 px-4 py-2 hover:bg-safari-50 rounded-lg transition-all"
+                >
+                  My Safaris
+                </button>
+              )}
+              {user && (
+                <>
+                  <div className="flex flex-col items-end mr-2">
+                    <span className="text-xs font-bold text-safari-900">{profile?.full_name}</span>
+                    <span className="text-[10px] text-safari-500 uppercase tracking-wider">{company?.name}</span>
+                  </div>
+                  {profile?.user_type !== 'user' && (
+                    <Tooltip content="Access the Partner Dashboard">
                       <button 
-                        onClick={() => {
-                          setAuthMode('signin');
-                          setAuthType('user');
-                          navigateToView('auth');
-                        }}
-                        className="text-sm font-bold text-safari-600 hover:text-safari-900 px-4 py-2 hover:bg-safari-50 rounded-lg transition-all"
+                        onClick={() => navigateToView('admin')}
+                        className="text-safari-400 hover:text-safari-600 transition-colors p-2 rounded-full hover:bg-safari-50"
+                        title="Partner Dashboard"
                       >
-                        My Safaris
+                        <Settings size={20} />
+                      </button>
+                    </Tooltip>
+                  )}
+                  <Tooltip content="Sign Out">
+                    <button 
+                      onClick={signOut}
+                      className="text-safari-400 hover:text-red-600 transition-colors p-2 rounded-full hover:bg-red-50"
+                      title="Sign Out"
+                    >
+                      <LogOut size={20} />
+                    </button>
+                  </Tooltip>
+                </>
+              )}
+            </div>
+
+            {/* Mobile Nav Toggle */}
+            <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="lg:hidden p-2 text-safari-600 hover:bg-safari-100 rounded-lg transition-colors"
+            >
+              {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+
+          {/* Mobile Menu Overlay for Planner App */}
+          {isMobileMenuOpen && (
+            <div className="lg:hidden fixed inset-0 top-[65px] bg-white z-[95] animate-fadeIn border-t border-safari-100">
+              <div className="p-8 flex flex-col gap-6 text-lg font-bold text-safari-700">
+                <button onClick={() => { setIsMobileMenuOpen(false); navigateHome(); }} className="flex items-center gap-3 py-2 border-b border-safari-50">
+                  <Home size={20} className="text-safari-400" /> Return Home
+                </button>
+                <button onClick={() => { setIsMobileMenuOpen(false); setViewMode('calculator'); }} className="flex items-center gap-3 py-2 border-b border-safari-50">
+                  <Calculator size={20} className="text-safari-400" /> Cost Calculator
+                </button>
+                
+                {!user ? (
+                  <button 
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setAuthMode('signin');
+                      setAuthType('user');
+                      navigateToView('auth');
+                    }}
+                    className="flex items-center gap-3 py-2 border-b border-safari-50"
+                  >
+                    <User size={20} className="text-safari-400" /> Start Planning
+                  </button>
+                ) : (
+                  <>
+                    <div className="py-4 border-b border-safari-50 flex items-center gap-3">
+                      <div className="w-10 h-10 bg-safari-100 rounded-full flex items-center justify-center text-safari-600">
+                        {profile?.full_name?.charAt(0) || 'U'}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-safari-900">{profile?.full_name}</p>
+                        <p className="text-[10px] text-safari-500 uppercase tracking-widest">{profile?.user_type}</p>
+                      </div>
+                    </div>
+                    {profile?.user_type !== 'user' && (
+                      <button 
+                        onClick={() => { setIsMobileMenuOpen(false); navigateToView('admin'); }} 
+                        className="flex items-center gap-3 py-2 border-b border-safari-50"
+                      >
+                        <Briefcase size={20} className="text-safari-400" /> Partner Dashboard
                       </button>
                     )}
-                    {user && (
-                      <>
-                        <div className="hidden lg:flex flex-col items-end mr-2">
-                          <span className="text-xs font-bold text-safari-900">{profile?.full_name}</span>
-                          <span className="text-[10px] text-safari-500 uppercase tracking-wider">{company?.name}</span>
-                        </div>
-                        {profile?.user_type !== 'user' && (
-                          <Tooltip content="Access the Partner Dashboard">
-                            <button 
-                              onClick={() => navigateToView('admin')}
-                              className="text-safari-400 hover:text-safari-600 transition-colors p-2 rounded-full hover:bg-safari-50"
-                              title="Partner Dashboard"
-                            >
-                              <Settings size={20} />
-                            </button>
-                          </Tooltip>
-                        )}
-                        <Tooltip content="Sign Out">
-                          <button 
-                            onClick={signOut}
-                            className="text-safari-400 hover:text-red-600 transition-colors p-2 rounded-full hover:bg-red-50"
-                            title="Sign Out"
-                          >
-                            <LogOut size={20} />
-                          </button>
-                        </Tooltip>
-                      </>
-                    )}
-                  </div>
-          </div>
+                    <button 
+                      onClick={() => { setIsMobileMenuOpen(false); signOut(); }}
+                      className="flex items-center gap-3 py-2 border-b border-safari-50 text-red-600"
+                    >
+                      <LogOut size={20} className="opacity-70" /> Sign Out
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </header>
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="max-w-7xl mx-auto px-8 sm:px-6 lg:px-8 py-8">
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-4 rounded-xl mb-8 flex items-start gap-3 animate-fadeIn">
               <AlertTriangle className="shrink-0 mt-0.5" size={20} />

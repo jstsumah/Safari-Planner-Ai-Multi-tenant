@@ -503,7 +503,7 @@ const CostingModule: React.FC<CostingModuleProps> = ({
               <ArrowLeft size={14} /> {backLabel}
             </button>
           )}
-          <h1 className="text-3xl font-black text-safari-900 flex items-center gap-3">
+          <h1 className="text-[25px] md:text-3xl font-black text-safari-900 flex items-center gap-3">
             {activeMode === 'project' ? (
               <><Tag className="text-safari-500" /> Itinerary Costing</>
             ) : (

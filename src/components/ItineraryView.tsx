@@ -214,9 +214,9 @@ const ItineraryView: React.FC<ItineraryViewProps> = ({
             className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
             referrerPolicy="no-referrer"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-8 md:p-12">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end px-12 pb-10 md:p-12">
             <div className="max-w-3xl">
-              <h1 className="text-4xl sm:text-5xl md:text-[60px] leading-tight md:leading-[60px] max-w-[640px] font-black text-white mb-4 drop-shadow-lg pr-6">
+              <h1 className="text-[25px] sm:text-5xl md:text-[60px] leading-tight md:leading-[60px] max-w-[640px] font-black text-white mb-4 drop-shadow-lg pr-6">
                 {itinerary.tripTitle}
               </h1>
               <div className="flex flex-wrap gap-6 text-white/90 font-bold text-sm md:text-base">

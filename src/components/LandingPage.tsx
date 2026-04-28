@@ -250,14 +250,6 @@ const LandingPage: React.FC<LandingPageProps> = ({
               <Calculator size={20} className="text-safari-400" /> Cost Calculator
             </a>
             <div className="pt-6 border-t border-safari-100 flex flex-col gap-4">
-              {!isAuthenticated && (
-                <button 
-                  onClick={() => { onAuth(); setIsMenuOpen(false); }}
-                  className="w-full bg-safari-900 text-white p-4 rounded-xl font-bold uppercase text-xs tracking-widest active:scale-95 transition-all"
-                >
-                  Start Planning / Sign In
-                </button>
-              )}
               {isAuthenticated && (
                 <button 
                   onClick={() => { 
@@ -269,7 +261,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                   <Briefcase size={16} className="text-safari-400" /> Partner Panel
                 </button>
               )}
-              <button onClick={() => { setIsMenuOpen(false); onStart(); }} className="w-full py-4 bg-safari-900 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg active:scale-95 transition-all">Start Planning</button>
+              <button onClick={() => { setIsMenuOpen(false); onAuth(); }} className="w-full py-4 bg-safari-900 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg active:scale-95 transition-all">Start Planning</button>
             </div>
           </div>
         </div>
@@ -277,12 +269,12 @@ const LandingPage: React.FC<LandingPageProps> = ({
 
       {/* Hero Section */}
       <section className="relative pt-32 md:pt-40 pb-20 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div className="max-w-7xl mx-auto px-8 md:px-6 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6 md:space-y-8 animate-fadeIn">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-safari-100 rounded-full text-safari-600 font-bold text-[10px] uppercase tracking-widest">
               <Heart size={14} className="fill-safari-600" /> For Travelers & Professionals
             </div>
-            <h1 className="text-5xl sm:text-6xl md:text-[60px] leading-[1.1] md:leading-[60px] max-w-[640px] font-extrabold text-safari-900 tracking-tighter pr-4 md:pr-0">
+            <h1 className="text-4xl sm:text-6xl md:text-[60px] leading-[1.1] md:leading-[60px] max-w-[640px] font-extrabold text-safari-900 tracking-tighter pr-4 md:pr-0">
               {branding.heroTitle || (
                 <>
                   The Art of the <span className="whitespace-nowrap">Safari, Decoded.</span>

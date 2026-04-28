@@ -383,10 +383,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
       </div>
 
       <div className="relative z-10 max-w-md w-full bg-white/70 backdrop-blur-xl rounded-xl shadow-2xl border border-white/40 overflow-hidden animate-fadeIn">
-        <div className="p-10">
-          <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 bg-safari-900/10 backdrop-blur-md rounded-lg flex items-center justify-center text-safari-900">
-              <Building2 size={32} />
+        <div className="p-8">
+          <div className="flex justify-center mb-6">
+            <div className="w-14 h-14 bg-safari-900/10 backdrop-blur-md rounded-lg flex items-center justify-center text-safari-900">
+              <Building2 size={28} />
             </div>
           </div>
 
@@ -487,7 +487,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                         required={regType !== 'user'}
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
-                        className="w-full px-5 py-4 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-4 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold"
+                        className="w-full px-5 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                         placeholder={regType === 'provider' ? "e.g. Serengeti Tours" : "e.g. Serengeti Luxury Lodge"}
                       />
                     </div>
@@ -501,7 +501,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                         required={regType !== 'user'}
                         value={companySlug}
                         onChange={(e) => setCompanySlug(e.target.value)}
-                        className="w-full px-5 py-4 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-4 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold"
+                        className="w-full px-5 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                         placeholder={regType === 'provider' ? "safari-operator" : "luxury-lodge"}
                       />
                     </div>
@@ -513,7 +513,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-5 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                  className="w-full py-4 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
                   onClick={(e) => {
                     if (regType === 'user') {
                       e.preventDefault();
@@ -560,7 +560,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                       required
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-4 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold"
+                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                       placeholder="e.g. Jane Doe"
                     />
                   </div>
@@ -574,7 +574,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-4 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold"
+                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                       placeholder="email@agency.com"
                     />
                   </div>
@@ -588,7 +588,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-4 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold"
+                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                       placeholder="••••••••"
                     />
                   </div>
@@ -598,7 +598,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-5 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                  className="w-full py-4 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
                 >
                   {loading ? <Loader2 className="animate-spin" /> : 'Complete Registration'}
                   <CheckCircle2 size={18} />
@@ -634,7 +634,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-4 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold"
+                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                       placeholder="email@agency.com"
                     />
                   </div>
@@ -657,7 +657,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-4 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold"
+                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                       placeholder="••••••••"
                     />
                   </div>
@@ -666,7 +666,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-5 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                  className="w-full py-4 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
                 >
                   {loading ? <Loader2 className="animate-spin" /> : 'Sign In'}
                   <ArrowRight size={18} />
@@ -735,7 +735,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                     required
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    className="w-full px-5 py-4 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-4 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold"
+                    className="w-full px-5 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                     placeholder={regType === 'provider' ? "e.g. Serengeti Tours" : "e.g. Serengeti Luxury Lodge"}
                   />
                 </div>
@@ -749,7 +749,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                     required
                     value={companySlug}
                     onChange={(e) => setCompanySlug(e.target.value)}
-                    className="w-full px-5 py-4 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-4 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold"
+                    className="w-full px-5 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                     placeholder={regType === 'provider' ? "safari-operator" : "luxury-lodge"}
                   />
                 </div>
@@ -757,7 +757,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-5 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                  className="w-full py-4 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
                 >
                   {loading ? <Loader2 className="animate-spin" /> : 'Launch Partner Hub'}
                   <CheckCircle2 size={18} />
@@ -783,7 +783,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-4 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold"
+                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                       placeholder="email@agency.com"
                     />
                   </div>
@@ -794,7 +794,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                 <button
                   type="submit"
                   disabled={loading || !!success}
-                  className="w-full py-5 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                  className="w-full py-4 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
                 >
                   {loading ? <Loader2 className="animate-spin" /> : 'Send Reset Link'}
                   <ArrowRight size={18} />
@@ -830,7 +830,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-4 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold"
+                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                       placeholder="••••••••"
                     />
                   </div>
@@ -841,7 +841,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                 <button
                   type="submit"
                   disabled={loading || !!success}
-                  className="w-full py-5 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                  className="w-full py-4 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
                 >
                   {loading ? <Loader2 className="animate-spin" /> : 'Update Password'}
                   <CheckCircle2 size={18} />

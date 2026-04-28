@@ -1109,17 +1109,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
   return (
     <div className="h-screen flex bg-safari-50 text-safari-900 font-sans relative overflow-hidden">
+      {/* Mobile Drawer Overlay */}
+      {!isSidebarCollapsed && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]" 
+          onClick={() => setIsSidebarCollapsed(true)}
+        />
+      )}
+
       {/* Fixed Sidebar */}
-      <aside className={`fixed top-0 left-0 bottom-0 bg-safari-900 text-white flex flex-col transition-all duration-300 ${isSidebarCollapsed ? 'w-20' : 'w-72'} border-r border-safari-800 shadow-2xl z-40`}>
+      <aside className={`fixed top-0 left-0 bottom-0 bg-safari-900 text-white flex flex-col transition-all duration-500 z-[110] lg:z-40 ${isSidebarCollapsed ? '-translate-x-full lg:translate-x-0 w-20' : 'translate-x-0 w-[280px] lg:w-72 shadow-2xl'}`}>
         <div className="p-6 h-20 flex items-center justify-between">
-          {!isSidebarCollapsed && (
-            <div className="flex items-center gap-3 overflow-hidden">
-              <Compass className="text-safari-400 shrink-0" size={28} />
-              <span className="font-extrabold tracking-tight text-xl truncate">
-                {company?.name || 'Partner Hub'}
-              </span>
-            </div>
-          )}
+          <div className={`flex items-center gap-3 overflow-hidden transition-opacity duration-300 ${isSidebarCollapsed && 'lg:opacity-0'}`}>
+            <Compass className="text-safari-400 shrink-0" size={28} />
+            <span className="font-extrabold tracking-tight text-xl truncate whitespace-nowrap">
+              {company?.name || 'Partner Hub'}
+            </span>
+          </div>
           <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="p-2 hover:bg-safari-800 rounded-lg transition-colors">
             {isSidebarCollapsed ? <Menu size={24} /> : <ChevronLeft size={24} />}
           </button>
@@ -1205,8 +1211,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       </aside>
 
       {/* Main Content Area */}
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarCollapsed ? 'ml-20' : 'ml-72'} h-screen`}>
-        <main className="flex-1 overflow-y-auto bg-gray-50 pb-20">
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${isSidebarCollapsed ? 'ml-0 lg:ml-20' : 'ml-0 lg:ml-72'} h-screen bg-gray-50 relative`}>
+        {/* Mobile Header Toggle - Fixed for all pages */}
+        <div className="lg:hidden h-16 bg-white border-b border-safari-100 flex items-center justify-between px-4 fixed top-0 left-0 right-0 z-40">
+          <div className="flex items-center gap-2">
+            <Compass className="text-safari-600" size={24} />
+            <span className="font-extrabold text-sm truncate max-w-[200px]">{company?.name || 'Partner Hub'}</span>
+          </div>
+          <button 
+            onClick={() => setIsSidebarCollapsed(false)} 
+            className="p-2 text-safari-600 border border-safari-100 rounded-lg shadow-sm"
+          >
+            <Menu size={24} />
+          </button>
+        </div>
+
+        <main className="flex-1 lg:overflow-y-auto bg-gray-50 pt-16 lg:pt-0 pb-32 lg:pb-0 overflow-x-hidden overflow-y-auto">
         {activeTab === 'dashboard' && (
           <div className="p-8 space-y-8 animate-fadeIn">
             <header>
@@ -2500,8 +2520,47 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         )}
       </main>
       
-      {/* Fixed Footer for Main Content */}
-      <footer className="bg-white border-t border-safari-200 p-4 text-center text-[10px] uppercase tracking-widest text-safari-400 font-bold shrink-0 z-30">
+      {/* Mobile Bottom Navigation - Fixed for all pages */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-safari-100 flex items-center justify-around px-4 z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+        <button 
+          onClick={() => navigateToTab('dashboard')}
+          className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'dashboard' ? 'text-safari-900 font-bold' : 'text-safari-400'}`}
+        >
+          <LayoutDashboard size={22} className={activeTab === 'dashboard' ? 'text-safari-600' : ''} />
+          <span className="text-[10px] uppercase tracking-tighter">Dash</span>
+        </button>
+        <button 
+          onClick={() => navigateToTab('properties')}
+          className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'properties' ? 'text-safari-900 font-bold' : 'text-safari-400'}`}
+        >
+          <Building size={22} className={activeTab === 'properties' ? 'text-safari-600' : ''} />
+          <span className="text-[10px] uppercase tracking-tighter">Inventory</span>
+        </button>
+        <button 
+          onClick={() => navigateToTab('leads')}
+          className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'leads' ? 'text-safari-900 font-bold' : 'text-safari-400'}`}
+        >
+          <MessageSquare size={22} className={activeTab === 'leads' ? 'text-safari-600' : ''} />
+          <span className="text-[10px] uppercase tracking-tighter">Leads</span>
+        </button>
+        <button 
+          onClick={() => navigateToTab('calculator')}
+          className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'calculator' ? 'text-safari-900 font-bold' : 'text-safari-400'}`}
+        >
+          <Wand2 size={22} className={activeTab === 'calculator' ? 'text-safari-600' : ''} />
+          <span className="text-[10px] uppercase tracking-tighter">Costing</span>
+        </button>
+        <button 
+          onClick={() => navigateToTab('settings')}
+          className={`flex flex-col items-center gap-1 p-2 ${activeTab === 'settings' ? 'text-safari-900 font-bold' : 'text-safari-400'}`}
+        >
+          <SettingsIcon size={22} className={activeTab === 'settings' ? 'text-safari-600' : ''} />
+          <span className="text-[10px] uppercase tracking-tighter">Settings</span>
+        </button>
+      </nav>
+      
+      {/* Footer for Desktop Views */}
+      <footer className="hidden lg:block bg-white border-t border-safari-200 p-4 text-center text-[10px] uppercase tracking-widest text-safari-400 font-bold shrink-0 z-30">
         © {new Date().getFullYear()} SafariPlanner.ai • Partner Dashboard
       </footer>
       </div>
