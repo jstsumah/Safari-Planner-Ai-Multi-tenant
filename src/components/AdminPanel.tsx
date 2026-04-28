@@ -9,7 +9,7 @@ import {
   Calculator, Bookmark, FileCheck, Wand2,
   Wallet, Settings as SettingsIcon, Palette,
   Share2, Check, Users, UserPlus, Type, Image as ImageIcon, HelpCircle, Quote, Database,
-  ShieldAlert, ShieldCheck, Upload, TrendingUp, ArrowUpRight, BarChart3, Activity, Clock, ArrowLeft
+  ShieldAlert, ShieldCheck, Upload, TrendingUp, ArrowUpRight, BarChart3, Activity, Clock, ArrowLeft, Link
 } from 'lucide-react';
 import { 
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
@@ -30,6 +30,8 @@ import MasterItineraryEditor from './MasterItineraryEditor';
 import DisbursementModule from './DisbursementModule';
 import PaymentVoucherModule from './PaymentVoucherModule';
 import ItineraryView from './ItineraryView';
+import SafariForm from './SafariForm';
+import { generateSafariItinerary } from '../services/aiService';
 
 import { Tooltip } from './ui/Tooltip';
 import { useAuth } from '../hooks/useAuth';
@@ -212,7 +214,7 @@ const DEFAULT_BRANDING: BrandingConfig = {
   financeEmail: 'finance@safariplanner.ai'
 };
 
-type AdminTab = 'dashboard' | 'properties' | 'property_edit' | 'property_view' | 'leads' | 'costing' | 'quotations' | 'invoices' | 'invoice_editor' | 'payments' | 'receipts' | 'signature_safaris' | 'safari_edit' | 'calculator' | 'disbursements' | 'payment_vouchers' | 'settings' | 'itinerary_view' | 'team' | 'super_hub';
+type AdminTab = 'dashboard' | 'properties' | 'property_edit' | 'property_view' | 'leads' | 'costing' | 'quotations' | 'invoices' | 'invoice_editor' | 'payments' | 'receipts' | 'signature_safaris' | 'safari_edit' | 'calculator' | 'planner' | 'disbursements' | 'payment_vouchers' | 'settings' | 'itinerary_view' | 'team' | 'super_hub';
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const { user, profile, company, refreshProfile, signOut } = useAuth();
@@ -291,9 +293,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [selectedMaster, setSelectedMaster] = useState<any | null>(null);
   const [copyingMasterId, setCopyingMasterId] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
-  const [viewingItinerary, setViewingItinerary] = useState<{itinerary: GeneratedItinerary, formData: SafariFormData, id?: string, type?: 'lead' | 'master'} | null>(null);
+  const [viewingItinerary, setViewingItinerary] = useState<{itinerary: GeneratedItinerary, formData: SafariFormData, id?: string, type?: 'lead' | 'master' | 'planner'} | null>(null);
+  const [isPlannerLoading, setIsPlannerLoading] = useState(false);
   const [isFinancialsOpen, setIsFinancialsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const handlePlannerSubmit = async (data: SafariFormData) => {
+    setIsPlannerLoading(true);
+    try {
+      // Create a trip title
+      data.tripTitle = data.tripTitle || `${data.name}'s Custom Safari`;
+      const result = await generateSafariItinerary(data);
+      setViewingItinerary({ itinerary: result, formData: data, type: 'planner' });
+      navigateToTab('itinerary_view');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Failed to generate itinerary. Please try again.");
+    } finally {
+      setIsPlannerLoading(false);
+    }
+  };
 
   // Super Hub Add States
   const [isAddCompanyOpen, setIsAddCompanyOpen] = useState(false);
@@ -345,19 +364,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   });
 
   const fetchLodges = useCallback(async () => {
-    if (!effectiveCompany && !profile?.is_super_user) return;
     setIsLodgesLoading(true);
     let query = supabase.from('lodges').select('*');
-    if (effectiveCompanyId) {
-      query = query.eq('company_id', effectiveCompanyId);
-    }
     try {
       const { data, error } = await query
         .order('created_at', { ascending: false });
       if (error) throw error;
       setLodges(data || []);
     } catch (err: any) { console.error(err); } finally { setIsLodgesLoading(false); }
-  }, [effectiveCompany, profile, managedCompanyId]);
+  }, []);
 
   const fetchGlobalData = useCallback(async () => {
     if (!profile?.is_super_user) return;
@@ -862,7 +877,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       }
 
       if (error) throw error;
-      toast.success(selectedMember ? 'Member updated.' : 'Member added.');
+      toast.success(selectedMember ? 'Member updated.' : 'Member added. Click "Email Invite" on their card to email them a signup link.');
       setIsTeamModalOpen(false);
       fetchTeamMembers();
     } catch (err: any) { toast.error(err.message); } finally { setIsLoading(false); }
@@ -1162,7 +1177,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         is_super_user: false
       }]);
       if (error) throw error;
-      toast.success("User profile created. They can login once their Auth account is ready.");
+      toast.success('User profile created. Click the mail icon on their card to email them an invite!');
       setIsAddUserOpen(false);
       fetchGlobalData();
     } catch (err: any) {
@@ -1248,7 +1263,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           </div>
 
           <NavItem icon={<Wand2 size={22} />} label="Quick Costing" isActive={activeTab === 'calculator'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('calculator')} />
-          <NavItem icon={<Compass size={22} />} label="Quick Planner" isActive={false} collapsed={isSidebarCollapsed} onClick={() => window.open('/', '_blank')} />
+          <NavItem icon={<Compass size={22} />} label="Quick Planner" isActive={activeTab === 'planner'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('planner')} />
           
           {profile?.is_super_user && (
             <div className="pt-4 mt-4 border-t border-safari-800">
@@ -1458,7 +1473,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                       </div>
                     </div>
                     <div className="h-[300px] w-full mt-4">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                         <AreaChart data={Array.from({ length: 7 }, (_, i) => {
                           const date = new Date();
                           date.setDate(date.getDate() - (6 - i));
@@ -1515,7 +1530,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   <section className="bg-white rounded-3xl p-8 border border-safari-100 shadow-sm shadow-safari-900/5">
                     <h3 className="text-lg font-black text-safari-900 mb-6">Market Distribution</h3>
                     <div className="h-[240px] w-full">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                         <PieChart>
                           <Pie
                             data={[
@@ -1920,6 +1935,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 profile?.is_super_user && { id: 'data', label: 'Global System Log', icon: <Database size={14} /> },
                 { id: 'visuals', label: 'Agency Branding', icon: <Palette size={14} /> },
                 { id: 'business', label: 'Agency & Finance', icon: <Building size={14} /> },
+                { id: 'payments', label: 'Payment Integrations', icon: <CreditCard size={14} /> },
               ].filter(Boolean).map((tab: any) => (
                 <button
                   key={tab.id}
@@ -2757,6 +2773,154 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               </div>
             )}
 
+            {activeSettingsTab === 'payments' && (
+              <div className="space-y-6 animate-fadeIn">
+                <section className="bg-white rounded-xl shadow-sm border border-safari-100 p-8">
+                  <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
+                    <div>
+                      <h3 className="text-lg font-bold text-safari-900 flex items-center gap-2 italic">
+                        <CreditCard className="text-safari-500" size={20} />
+                        Payment Gateways
+                      </h3>
+                      <p className="text-sm text-safari-500 font-medium">Configure credentials and processing rules for your payment processors.</p>
+                    </div>
+                  </div>
+
+                  {/* PayPal */}
+                  <div className="space-y-6 mb-10">
+                    <div className="flex items-center justify-between border-b border-safari-100 pb-4">
+                      <div>
+                        <h4 className="font-black text-safari-900 tracking-tight flex items-center gap-2">PayPal Integration</h4>
+                        <p className="text-xs text-safari-500 max-w-xl">Accept payments globally with PayPal.</p>
+                      </div>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-safari-400">Enable</span>
+                        <div className={`w-12 h-6 rounded-full transition-colors relative ${branding?.paymentGateways?.paypal?.enabled ? 'bg-green-500' : 'bg-gray-300'}`}
+                             onClick={() => {
+                               const paypalArgs = branding.paymentGateways?.paypal || { enabled: false, clientId: '', clientSecret: '', ipnUrl: '' };
+                               setBranding({ ...branding, paymentGateways: { ...branding.paymentGateways, paypal: { ...paypalArgs, enabled: !paypalArgs.enabled } }});
+                             }}>
+                           <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${branding?.paymentGateways?.paypal?.enabled ? 'left-7' : 'left-1'}`} />
+                        </div>
+                      </label>
+                    </div>
+                    {branding?.paymentGateways?.paypal?.enabled && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-safari-50 rounded-lg border border-safari-100">
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">Client ID</label>
+                          <input type="text" className="w-full p-3 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
+                            value={branding?.paymentGateways?.paypal?.clientId || ''}
+                            onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, paypal: {...branding.paymentGateways?.paypal, clientId: e.target.value} as any}})} />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">Client Secret</label>
+                          <input type="password" className="w-full p-3 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
+                            value={branding?.paymentGateways?.paypal?.clientSecret || ''}
+                            onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, paypal: {...branding.paymentGateways?.paypal, clientSecret: e.target.value} as any}})} />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">IPN / Callback URL (For your PayPal Dashboard)</label>
+                          <input type="text" className="w-full p-3 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
+                            value={branding?.paymentGateways?.paypal?.ipnUrl || `${window.location.origin}/api/webhooks/paypal`}
+                            onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, paypal: {...branding.paymentGateways?.paypal, ipnUrl: e.target.value} as any}})} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* PesaPal */}
+                  <div className="space-y-6 mb-10">
+                    <div className="flex items-center justify-between border-b border-safari-100 pb-4">
+                      <div>
+                        <h4 className="font-black text-safari-900 tracking-tight flex items-center gap-2">PesaPal Integration</h4>
+                        <p className="text-xs text-safari-500 max-w-xl">Accept mobile money (M-Pesa, Airtel) and local cards across East Africa.</p>
+                      </div>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-safari-400">Enable</span>
+                        <div className={`w-12 h-6 rounded-full transition-colors relative ${branding?.paymentGateways?.pesapal?.enabled ? 'bg-green-500' : 'bg-gray-300'}`}
+                             onClick={() => {
+                               const pesaArgs = branding.paymentGateways?.pesapal || { enabled: false, consumerKey: '', consumerSecret: '', ipnUrl: '' };
+                               setBranding({ ...branding, paymentGateways: { ...branding.paymentGateways, pesapal: { ...pesaArgs, enabled: !pesaArgs.enabled } }});
+                             }}>
+                           <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${branding?.paymentGateways?.pesapal?.enabled ? 'left-7' : 'left-1'}`} />
+                        </div>
+                      </label>
+                    </div>
+                    {branding?.paymentGateways?.pesapal?.enabled && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-safari-50 rounded-lg border border-safari-100">
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">Consumer Key</label>
+                          <input type="text" className="w-full p-3 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
+                            value={branding?.paymentGateways?.pesapal?.consumerKey || ''}
+                            onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, pesapal: {...branding.paymentGateways?.pesapal, consumerKey: e.target.value} as any}})} />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">Consumer Secret</label>
+                          <input type="password" className="w-full p-3 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
+                            value={branding?.paymentGateways?.pesapal?.consumerSecret || ''}
+                            onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, pesapal: {...branding.paymentGateways?.pesapal, consumerSecret: e.target.value} as any}})} />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">IPN / Callback URL</label>
+                          <input type="text" className="w-full p-3 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
+                            value={branding?.paymentGateways?.pesapal?.ipnUrl || `${window.location.origin}/api/webhooks/pesapal`}
+                            onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, pesapal: {...branding.paymentGateways?.pesapal, ipnUrl: e.target.value} as any}})} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Stripe */}
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between border-b border-safari-100 pb-4">
+                      <div>
+                        <h4 className="font-black text-safari-900 tracking-tight flex items-center gap-2">Stripe Integration</h4>
+                        <p className="text-xs text-safari-500 max-w-xl">Accept domestic and international credit cards seamlessly.</p>
+                      </div>
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-safari-400">Enable</span>
+                        <div className={`w-12 h-6 rounded-full transition-colors relative ${branding?.paymentGateways?.stripe?.enabled ? 'bg-green-500' : 'bg-gray-300'}`}
+                             onClick={() => {
+                               const stripeArgs = branding.paymentGateways?.stripe || { enabled: false, publicKey: '', secretKey: '', webhookSecret: '' };
+                               setBranding({ ...branding, paymentGateways: { ...branding.paymentGateways, stripe: { ...stripeArgs, enabled: !stripeArgs.enabled } }});
+                             }}>
+                           <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${branding?.paymentGateways?.stripe?.enabled ? 'left-7' : 'left-1'}`} />
+                        </div>
+                      </label>
+                    </div>
+                    {branding?.paymentGateways?.stripe?.enabled && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-safari-50 rounded-lg border border-safari-100">
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">Publishable Key</label>
+                          <input type="text" className="w-full p-3 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
+                            value={branding?.paymentGateways?.stripe?.publicKey || ''}
+                            onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, stripe: {...branding.paymentGateways?.stripe, publicKey: e.target.value} as any}})} />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">Secret Key</label>
+                          <input type="password" className="w-full p-3 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
+                            value={branding?.paymentGateways?.stripe?.secretKey || ''}
+                            onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, stripe: {...branding.paymentGateways?.stripe, secretKey: e.target.value} as any}})} />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">Webhook Setup (Stripe Dashboard &gt; Webhooks)</label>
+                          <p className="text-xs text-safari-500 mb-2">Configure this endpoint URL in Stripe and paste the Endpoint Secret below to verify events.</p>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="p-3 bg-white border border-safari-200 rounded-lg font-mono text-xs flex-1 truncate">{window.location.origin}/api/webhooks/stripe</span>
+                            <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/stripe`); toast.success('Webhook URL copied!'); }} className="p-3 bg-safari-800 text-white rounded-lg hover:bg-safari-900 transition"><Link size={16}/></button>
+                          </div>
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest mb-1 mt-4">Webhook Endpoint Secret</label>
+                          <input type="password" placeholder="whsec_..." className="w-full p-3 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
+                            value={branding?.paymentGateways?.stripe?.webhookSecret || ''}
+                            onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, stripe: {...branding.paymentGateways?.stripe, webhookSecret: e.target.value} as any}})} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </div>
+            )}
+
             {activeSettingsTab === 'data' && profile?.is_super_user && (
               <div className="space-y-6 animate-fadeIn">
                 <section className="bg-white rounded-xl shadow-sm border border-safari-100 p-8">
@@ -2863,6 +3027,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                     <div className="flex justify-end gap-2 pt-4 border-t border-safari-50">
                       <button 
                         onClick={() => {
+                          const inviteUrl = `${window.location.origin}/?auth=signup&type=agency`;
+                          const subject = encodeURIComponent(`Invitation to join ${managedCompany?.name || company?.name || 'our team'}`);
+                          const body = encodeURIComponent(`Hi ${member.name},\n\nYou've been invited to join ${managedCompany?.name || company?.name || 'our team'}.\n\nPlease sign up here to access your account:\n${inviteUrl}`);
+                          window.location.href = `mailto:${member.email}?subject=${subject}&body=${body}`;
+                          toast.success('Opening email client...');
+                        }}
+                        title="Send Invite Email"
+                        className="p-2 bg-safari-50 text-safari-600 rounded-lg hover:bg-safari-100 transition-all flex items-center gap-1"
+                      >
+                        <Mail size={16} />
+                        <span className="text-xs font-bold pl-1 uppercase tracking-wider pr-1">Email Invite</span>
+                      </button>
+                      <button 
+                        onClick={() => {
                           setSelectedMember(member);
                           setMemberFormData({
                             name: member.name,
@@ -2912,6 +3090,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         {/* Fixed confirmedQuotes error by using allBilledQuotes */}
         {activeTab === 'disbursements' && <div className="p-8"><DisbursementModule itineraries={allBilledQuotes} branding={branding} onBack={goBack} /></div>}
         {activeTab === 'calculator' && <div className="p-8"><CostingModule itinerary={DUMMY_ITINERARY} formData={DUMMY_FORM_DATA} lodges={lodges} customRates={customRates} branding={branding} onBack={goBack} initialMode="calculator" /></div>}
+        {activeTab === 'planner' && (
+          <div className="p-8 max-w-4xl mx-auto">
+            <div className="bg-white rounded-3xl shadow-xl border border-safari-100 overflow-hidden min-h-[600px] flex">
+              <SafariForm 
+                onSubmit={handlePlannerSubmit}
+                isLoading={isPlannerLoading}
+                branding={branding}
+                companyId={effectiveCompany?.id || effectiveCompanyId}
+                isWidget={false}
+              />
+            </div>
+          </div>
+        )}
         {activeTab === 'property_edit' && (
           <div className="p-8">
             <LodgeEditor 
@@ -3763,6 +3954,22 @@ const SuperHubView = ({
                       {!p.is_super_user && (
                         <div className="flex justify-end items-center gap-3 relative z-10 pointer-events-auto">
                           <div className="flex gap-2 relative z-20">
+                            <button 
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const inviteUrl = `${window.location.origin}/?auth=signup&type=${p.user_type || 'agency'}`;
+                                const subject = encodeURIComponent('Your account is ready');
+                                const body = encodeURIComponent(`Hi ${p.full_name},\n\nYour account has been provisioned.\n\nPlease sign up here to access your account:\n${inviteUrl}`);
+                                window.location.href = `mailto:${p.email}?subject=${subject}&body=${body}`;
+                                toast.success('Opening email client...');
+                              }}
+                              className="p-3 bg-safari-50 text-safari-600 rounded-xl hover:bg-safari-100 transition-all shadow-sm border border-safari-100 flex items-center justify-center min-w-[40px] cursor-pointer pointer-events-auto relative z-30"
+                              title="Send Invite Email"
+                            >
+                              <Mail size={18} />
+                            </button>
                             <button 
                               type="button"
                               onClick={(e) => {

@@ -190,6 +190,7 @@ const App: React.FC = () => {
 
   const [viewMode, setViewMode] = useState<'landing' | 'form' | 'itinerary' | 'history' | 'admin' | 'calculator' | 'auth' | 'partners'>(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get('auth') || params.get('invite')) return 'auth';
     if (params.get('master') || params.get('itin')) return 'itinerary';
     if (params.get('tool') === 'calculator') return 'calculator';
     if (params.get('tool') === 'planner') return 'form';
@@ -234,8 +235,16 @@ const App: React.FC = () => {
     });
   };
 
-  const [authMode, setAuthMode] = useState<'signup' | 'signin'>('signup');
-  const [authType, setAuthType] = useState<'agency' | 'user'>('agency');
+  const [authMode, setAuthMode] = useState<'signup' | 'signin'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('auth') === 'signin' ? 'signin' : 'signup';
+  });
+  
+  const [authType, setAuthType] = useState<'agency' | 'user'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const type = params.get('type');
+    return type === 'user' ? 'user' : 'agency';
+  });
 
   const [isFromHistory, setIsFromHistory] = useState(false);
   const [isFromAdmin, setIsFromAdmin] = useState(false);
@@ -631,12 +640,7 @@ const App: React.FC = () => {
           onViewProfile={() => setIsProfileOpen(true)}
           onViewPartners={() => navigateToView('partners')}
           onStart={() => {
-            if (user && profile) {
-              const userType = user.user_metadata?.user_type || (profile.company_id ? 'agency' : 'user');
-              navigateToView(userType === 'user' ? 'history' : 'admin');
-            } else {
-              navigateToView('form');
-            }
+            navigateToView('form');
           }} 
           onAuth={() => {
             if (user && profile) {

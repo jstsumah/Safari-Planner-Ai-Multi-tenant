@@ -464,22 +464,24 @@ const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies 
                  <ImageIcon className="text-safari-500" /> Digital Assets
               </h3>
               <p className="text-sm text-safari-500 leading-relaxed">Gallery items for itineraries. Upload to storage or select from your company library.</p>
-              <div className="mt-6 flex flex-col gap-3">
-                <input type="file" ref={fileInputRef} onChange={handleFileUpload} multiple accept="image/*" className="hidden" />
-                <button 
-                  onClick={() => {
-                    setIsStorageBrowserOpen(true);
-                    fetchStorageImages();
-                  }}
-                  className="w-full px-6 py-4 bg-safari-800 text-white rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3 hover:bg-safari-900 transition-all shadow-lg"
-                >
-                  <Search size={18} /> Library Browser
-                </button>
-                <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="w-full flex items-center justify-center gap-3 p-4 bg-safari-100 text-safari-600 rounded-xl hover:bg-safari-200 transition-all font-black uppercase text-[10px] tracking-widest text-center">
-                  {isUploading ? <Loader2 className="animate-spin" size={18} /> : <UploadCloud size={18} />}
-                  <span>{isUploading ? 'Uploading...' : 'Direct Upload'}</span>
-                </button>
-              </div>
+              {isOwner && (
+                <div className="mt-6 flex flex-col gap-3">
+                  <input type="file" ref={fileInputRef} onChange={handleFileUpload} multiple accept="image/*" className="hidden" />
+                  <button 
+                    onClick={() => {
+                      setIsStorageBrowserOpen(true);
+                      fetchStorageImages();
+                    }}
+                    className="w-full px-6 py-4 bg-safari-800 text-white rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3 hover:bg-safari-900 transition-all shadow-lg"
+                  >
+                    <Search size={18} /> Library Browser
+                  </button>
+                  <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="w-full flex items-center justify-center gap-3 p-4 bg-safari-100 text-safari-600 rounded-xl hover:bg-safari-200 transition-all font-black uppercase text-[10px] tracking-widest text-center">
+                    {isUploading ? <Loader2 className="animate-spin" size={18} /> : <UploadCloud size={18} />}
+                    <span>{isUploading ? 'Uploading...' : 'Direct Upload'}</span>
+                  </button>
+                </div>
+              )}
             </div>
             <div className="lg:col-span-2 space-y-8">
                 {formData.images && formData.images.length > 0 ? (
@@ -487,15 +489,17 @@ const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies 
                     {formData.images.map((img, idx) => (
                       <div key={idx} className="group relative aspect-video bg-safari-50 rounded-2xl overflow-hidden border border-safari-100 shadow-md transform transition-all hover:scale-[1.02]">
                         <img src={img} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        <div className="absolute inset-0 bg-safari-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button onClick={() => {
-                              const updatedImages = [...(formData.images || [])];
-                              updatedImages.splice(idx, 1);
-                              setFormData({ ...formData, images: updatedImages });
-                          }} className="p-3 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all shadow-xl">
-                              <Trash2 size={20} />
-                          </button>
-                        </div>
+                        {isOwner && (
+                          <div className="absolute inset-0 bg-safari-900/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button onClick={() => {
+                                const updatedImages = [...(formData.images || [])];
+                                updatedImages.splice(idx, 1);
+                                setFormData({ ...formData, images: updatedImages });
+                            }} className="p-3 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all shadow-xl">
+                                <Trash2 size={20} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -567,21 +571,22 @@ const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies 
               <h3 className="text-xl font-black text-safari-900 flex items-center gap-3">
                  <LayoutGrid className="text-safari-500" /> Units & Net Rates
               </h3>
-              <button onClick={() => setFormData({...formData, unit_categories: [...(formData.unit_categories || []), { id: `unit-${Date.now()}`, name: 'New Unit', total_units: 1, max_occupancy: 2, seasonal_rates: (formData.seasons || []).map(s => ({ seasonId: s.id, adultPrice: 0, youngAdultPrice: 0, childPrice: 0 })) }]})} className="px-6 py-2 bg-safari-800 text-white rounded-lg font-bold text-xs uppercase shadow-md hover:bg-safari-900 transition-all"><Plus size={16} className="inline mr-2" /> Add Category</button>
+              {isOwner && <button onClick={() => setFormData({...formData, unit_categories: [...(formData.unit_categories || []), { id: `unit-${Date.now()}`, name: 'New Unit', total_units: 1, max_occupancy: 2, seasonal_rates: (formData.seasons || []).map(s => ({ seasonId: s.id, adultPrice: 0, youngAdultPrice: 0, childPrice: 0 })) }]})} className="px-6 py-2 bg-safari-800 text-white rounded-lg font-bold text-xs uppercase shadow-md hover:bg-safari-900 transition-all"><Plus size={16} className="inline mr-2" /> Add Category</button>}
            </div>
            <div className="space-y-10">
               {formData.unit_categories?.map((unit, uIdx) => (
                 <div key={unit.id} className="bg-white rounded-xl border border-safari-200 overflow-hidden shadow-lg animate-fadeIn">
                    <div className="bg-safari-900 p-6 flex justify-between items-center">
-                      <input className="bg-transparent text-white font-black text-xl border-b border-white/20 outline-none w-full max-w-md focus:border-white transition-all" value={unit.name} onChange={(e) => updateNestedUnit(uIdx, 'name', e.target.value)} placeholder="Unit Name" />
-                      <button onClick={() => setFormData({...formData, unit_categories: (formData.unit_categories || []).filter((_, i) => i !== uIdx)})} className="p-2 text-white/40 hover:text-red-400 transition-colors"><Trash2 size={20} /></button>
+                      <input disabled={!isOwner} className="bg-transparent text-white font-black text-xl border-b border-transparent hover:border-white/20 focus:border-white outline-none w-full max-w-md transition-all disabled:opacity-100 disabled:hover:border-transparent" value={unit.name} onChange={(e) => updateNestedUnit(uIdx, 'name', e.target.value)} placeholder="Unit Name" />
+                      {isOwner && <button onClick={() => setFormData({...formData, unit_categories: (formData.unit_categories || []).filter((_, i) => i !== uIdx)})} className="p-2 text-white/40 hover:text-red-400 transition-colors"><Trash2 size={20} /></button>}
                    </div>
                    <div className="p-6 bg-gray-50 border-b border-safari-100 grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-[10px] font-black uppercase text-safari-400 mb-2">Total Units Available</label>
                         <input 
                           type="number" 
-                          className="w-full p-2.5 rounded-lg border border-safari-200 font-bold bg-white focus:ring-2 focus:ring-safari-500 outline-none" 
+                          disabled={!isOwner}
+                          className="w-full p-2.5 rounded-lg border border-safari-200 font-bold bg-white focus:ring-2 focus:ring-safari-500 outline-none disabled:opacity-70 disabled:bg-gray-100" 
                           value={unit.total_units} 
                           onChange={(e) => updateNestedUnit(uIdx, 'total_units', parseInt(e.target.value) || 0)} 
                         />
@@ -590,7 +595,8 @@ const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies 
                         <label className="block text-[10px] font-black uppercase text-safari-400 mb-2">Max Occupancy (Guests)</label>
                         <input 
                           type="number" 
-                          className="w-full p-2.5 rounded-lg border border-safari-200 font-bold bg-white focus:ring-2 focus:ring-safari-500 outline-none" 
+                          disabled={!isOwner}
+                          className="w-full p-2.5 rounded-lg border border-safari-200 font-bold bg-white focus:ring-2 focus:ring-safari-500 outline-none disabled:opacity-70 disabled:bg-gray-100" 
                           value={unit.max_occupancy} 
                           onChange={(e) => updateNestedUnit(uIdx, 'max_occupancy', parseInt(e.target.value) || 0)} 
                         />

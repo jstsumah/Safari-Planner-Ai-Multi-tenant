@@ -118,6 +118,26 @@ export interface BrandingConfig {
     activities?: string[];
     accommodationTypes?: string[];
   };
+  paymentGateways?: {
+    stripe?: {
+      enabled: boolean;
+      publicKey: string;
+      secretKey: string;
+      webhookSecret: string;
+    };
+    paypal?: {
+      enabled: boolean;
+      clientId: string;
+      clientSecret: string;
+      ipnUrl: string;
+    };
+    pesapal?: {
+      enabled: boolean;
+      consumerKey: string;
+      consumerSecret: string;
+      ipnUrl: string;
+    };
+  };
 }
 
 export interface Season {
