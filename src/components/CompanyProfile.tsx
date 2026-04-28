@@ -71,58 +71,114 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
   const secondaryColor = branding?.secondaryColor || '#413c31';
 
   const fetchCompanyData = useCallback(async () => {
-    const { data } = await supabase.from('companies').select('*').eq('id', companyId).single();
-    if (data) setCompanyInfo(data);
+    try {
+      // Try fetching by ID (UUID) first, then by slug
+      const isUuid = companyId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      
+      const query = isUuid 
+        ? supabase.from('companies').select('*').eq('id', companyId).single()
+        : supabase.from('companies').select('*').eq('slug', companyId).single();
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      if (data) setCompanyInfo(data);
+    } catch (err: any) {
+      console.error("Error fetching company data:", err);
+      // Don't toast here as it might be annoying on initial load, but log it
+    }
   }, [companyId]);
 
   const fetchReviews = useCallback(async () => {
-    const { data } = await supabase
-      .from('reviews')
-      .select('*')
-      .eq('company_id', companyId)
-      .order('created_at', { ascending: false });
-    if (data) setReviews(data);
-  }, [companyId]);
+    try {
+      const { data, error } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
+      if (error) {
+        // If companyId is a slug, we need the UUID for this query
+        if (companyInfo?.id) {
+          const { data: retryData } = await supabase
+            .from('reviews')
+            .select('*')
+            .eq('company_id', companyInfo.id)
+            .order('created_at', { ascending: false });
+          if (retryData) setReviews(retryData);
+        }
+        return;
+      }
+      if (data) setReviews(data);
+    } catch (err) {
+      console.error("Error fetching reviews:", err);
+    }
+  }, [companyId, companyInfo?.id]);
 
   const fetchTeam = useCallback(async () => {
-    const { data } = await supabase
-      .from('team_members')
-      .select('id, name, role, photo_url, is_public')
-      .eq('company_id', companyId)
-      .neq('is_public', false)
-      .limit(6);
-    if (data) setTeam(data);
-  }, [companyId]);
+    try {
+      const targetId = companyInfo?.id || companyId;
+      const { data, error } = await supabase
+        .from('team_members')
+        .select('id, name, role, photo_url, is_public')
+        .eq('company_id', targetId)
+        .neq('is_public', false)
+        .limit(6);
+      if (error) return;
+      if (data) setTeam(data);
+    } catch (err) {
+      console.error("Error fetching team:", err);
+    }
+  }, [companyId, companyInfo?.id]);
 
   const fetchLodges = useCallback(async () => {
-    const { data } = await supabase
-      .from('lodges')
-      .select('id, name, location, property_type, tier, images')
-      .eq('company_id', companyId)
-      .limit(6);
-    if (data) setLodges(data);
-  }, [companyId]);
+    try {
+      const targetId = companyInfo?.id || companyId;
+      const { data, error } = await supabase
+        .from('lodges')
+        .select('id, name, location, property_type, tier, images')
+        .eq('company_id', targetId)
+        .limit(6);
+      if (error) return;
+      if (data) setLodges(data);
+    } catch (err) {
+      console.error("Error fetching lodges:", err);
+    }
+  }, [companyId, companyInfo?.id]);
 
   const fetchSafaris = useCallback(async () => {
-    // Fetch master itineraries as the "marketing portfolio" safaris
-    const { data } = await supabase
-      .from('master_itineraries')
-      .select('id, title, summary, itinerary_data, created_at')
-      .eq('company_id', companyId)
-      .limit(3);
-    if (data) setSafaris(data);
-  }, [companyId]);
+    try {
+      const targetId = companyInfo?.id || companyId;
+      // Fetch master itineraries as the "marketing portfolio" safaris
+      const { data, error } = await supabase
+        .from('master_itineraries')
+        .select('id, title:trip_title, summary:description, itinerary_data, created_at')
+        .eq('company_id', targetId)
+        .limit(3);
+      if (error) return;
+      if (data) setSafaris(data);
+    } catch (err) {
+      console.error("Error fetching safaris:", err);
+    }
+  }, [companyId, companyInfo?.id]);
 
   useEffect(() => {
     const init = async () => {
+      // First fetch company data to get the true UUID if we have a slug
       await fetchCompanyData();
-      await fetchReviews();
-      await fetchTeam();
-      await fetchLodges();
-      await fetchSafaris();
     };
     init();
-  }, [fetchCompanyData, fetchReviews, fetchTeam, fetchLodges, fetchSafaris]);
+  }, [fetchCompanyData]);
+
+  useEffect(() => {
+    if (companyInfo || companyId) {
+      // Fetch secondary data in parallel
+      Promise.all([
+        fetchReviews(),
+        fetchTeam(),
+        fetchLodges(),
+        fetchSafaris()
+      ]);
+    }
+  }, [fetchReviews, fetchTeam, fetchLodges, fetchSafaris, companyInfo, companyId]);
 
   const handleAddReview = async (e: React.FormEvent) => {
     e.preventDefault();

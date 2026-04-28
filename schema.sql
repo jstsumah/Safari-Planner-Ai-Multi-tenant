@@ -124,7 +124,9 @@ CREATE TABLE IF NOT EXISTS reviews (
 
 -- Enable RLS for Reviews
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Public Read Reviews" ON reviews FOR SELECT USING (true);
+
+-- Ensure all companies have active status
+UPDATE companies SET status = 'active' WHERE status IS NULL;
 CREATE POLICY "Public Insert Reviews" ON reviews FOR INSERT WITH CHECK (true);
 CREATE POLICY "Super User Global Access - Reviews" ON reviews FOR ALL USING (is_super_user());
 CREATE POLICY "Admins can manage own reviews" ON reviews FOR ALL USING (company_id = get_my_company());
@@ -203,60 +205,66 @@ ALTER TABLE global_activities ENABLE ROW LEVEL SECURITY;
 -- RLS Policies
 
 -- Super User Global Access (ALL)
-CREATE POLICY "Super User Global Access" ON companies FOR ALL USING (is_super_user());
-CREATE POLICY "Super User Global Access" ON profiles FOR ALL USING (is_super_user());
-CREATE POLICY "Super User Global Access" ON lodges FOR ALL USING (is_super_user());
-CREATE POLICY "Super User Global Access" ON master_itineraries FOR ALL USING (is_super_user());
-CREATE POLICY "Super User Global Access" ON itineraries FOR ALL USING (is_super_user());
-CREATE POLICY "Super User Global Access" ON payments FOR ALL USING (is_super_user());
-CREATE POLICY "Super User Global Access" ON agency_config FOR ALL USING (is_super_user());
-CREATE POLICY "Super User Global Access" ON gallery_images FOR ALL USING (is_super_user());
-CREATE POLICY "Super User Global Access" ON team_members FOR ALL USING (is_super_user());
-CREATE POLICY "Super User Global Access" ON lodge_custom_rates FOR ALL USING (is_super_user());
+CREATE POLICY "Super User Global Access - Companies" ON companies FOR ALL USING (is_super_user());
+CREATE POLICY "Super User Global Access - Profiles" ON profiles FOR ALL USING (is_super_user());
+CREATE POLICY "Super User Global Access - Lodges" ON lodges FOR ALL USING (is_super_user());
+CREATE POLICY "Super User Global Access - Master Itineraries" ON master_itineraries FOR ALL USING (is_super_user());
+CREATE POLICY "Super User Global Access - Itineraries" ON itineraries FOR ALL USING (is_super_user());
+CREATE POLICY "Super User Global Access - Payments" ON payments FOR ALL USING (is_super_user());
+CREATE POLICY "Super User Global Access - Agency Config" ON agency_config FOR ALL USING (is_super_user());
+CREATE POLICY "Super User Global Access - Gallery Images" ON gallery_images FOR ALL USING (is_super_user());
+CREATE POLICY "Super User Global Access - Team Members" ON team_members FOR ALL USING (is_super_user());
+CREATE POLICY "Super User Global Access - Custom Rates" ON lodge_custom_rates FOR ALL USING (is_super_user());
 CREATE POLICY "Super User Global Access - Park Fees" ON park_fees FOR ALL USING (is_super_user());
 CREATE POLICY "Super User Global Access - Activities" ON global_activities FOR ALL USING (is_super_user());
 
--- Companies: Access to own company
-CREATE POLICY "Users can view their own company" ON companies
-    FOR SELECT USING (true); -- Companies are publicly readable by slug, but manageable by members
-CREATE POLICY "Admins can update their own company" ON companies
-    FOR UPDATE USING (id = get_my_company());
-CREATE POLICY "Users can insert companies" ON companies
-    FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+-- Companies: Public Read, Authenticated Management
+CREATE POLICY "Public Read Companies" ON companies FOR SELECT USING (true);
+CREATE POLICY "Admins can update their own company" ON companies FOR UPDATE USING (id = get_my_company());
+CREATE POLICY "Users can insert companies" ON companies FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 -- Profiles: Access to shared company profiles
-CREATE POLICY "Users can view profiles in their company" ON profiles
-    FOR SELECT USING (company_id = get_my_company());
+CREATE POLICY "Users can view profiles in their company" ON profiles FOR SELECT USING (company_id = get_my_company());
+CREATE POLICY "Users can manage their own profile" ON profiles FOR ALL USING (id = auth.uid()) WITH CHECK (id = auth.uid());
 
-CREATE POLICY "Users can manage their own profile" ON profiles
-    FOR ALL USING (id = auth.uid())
-    WITH CHECK (id = auth.uid());
+-- Lodges
+CREATE POLICY "Public Read Lodges" ON lodges FOR SELECT USING (true);
+CREATE POLICY "Company Data Isolation - Lodges" ON lodges FOR ALL USING (company_id = get_my_company());
+
+-- Master Itineraries
+CREATE POLICY "Public Read Master Itineraries" ON master_itineraries FOR SELECT USING (true);
+CREATE POLICY "Company Data Isolation - Master Itineraries" ON master_itineraries FOR ALL USING (company_id = get_my_company());
+
+-- Itineraries
+CREATE POLICY "Public Read Itineraries" ON itineraries FOR SELECT USING (true);
+CREATE POLICY "Company Data Isolation - Itineraries" ON itineraries FOR ALL USING (company_id = get_my_company());
+
+-- Team Members
+CREATE POLICY "Public Read Team Members" ON team_members FOR SELECT USING (true);
+CREATE POLICY "Company Data Isolation - Team Members" ON team_members FOR ALL USING (company_id = get_my_company());
+
+-- Reviews
+CREATE POLICY "Public Read Reviews" ON reviews FOR SELECT USING (true);
+CREATE POLICY "Public Insert Reviews" ON reviews FOR INSERT WITH CHECK (true);
+CREATE POLICY "Admins can manage own reviews" ON reviews FOR ALL USING (company_id = get_my_company());
+
+-- Payments
+CREATE POLICY "Public Read Payments" ON payments FOR SELECT USING (true);
+CREATE POLICY "Company Data Isolation - Payments" ON payments FOR ALL USING (company_id = get_my_company());
+
+-- Agency Config
+CREATE POLICY "Public Read Agency Config" ON agency_config FOR SELECT USING (true);
+CREATE POLICY "Company Data Isolation - Agency Config" ON agency_config FOR ALL USING (company_id = get_my_company());
+
+-- Gallery Images
+CREATE POLICY "Public Read Gallery Images" ON gallery_images FOR SELECT USING (true);
+CREATE POLICY "Company Data Isolation - Gallery Images" ON gallery_images FOR ALL USING (company_id = get_my_company());
 
 -- Custom Rates Isolation
 CREATE POLICY "Users can view company custom rates" ON lodge_custom_rates FOR SELECT USING (company_id = get_my_company());
 CREATE POLICY "Users can manage company custom rates" ON lodge_custom_rates FOR ALL USING (company_id = get_my_company());
 
--- All other tables: Isolated by company_id
-CREATE POLICY "Company Data Isolation - Lodges" ON lodges FOR ALL USING (company_id = get_my_company());
-CREATE POLICY "Company Data Isolation - Master Itineraries" ON master_itineraries FOR ALL USING (company_id = get_my_company());
-CREATE POLICY "Company Data Isolation - Itineraries" ON itineraries FOR ALL USING (company_id = get_my_company());
-CREATE POLICY "Company Data Isolation - Payments" ON payments FOR ALL USING (company_id = get_my_company());
-CREATE POLICY "Company Data Isolation - Agency Config" ON agency_config FOR ALL USING (company_id = get_my_company());
-CREATE POLICY "Company Data Isolation - Gallery Images" ON gallery_images FOR ALL USING (company_id = get_my_company());
-CREATE POLICY "Company Data Isolation - Team Members" ON team_members FOR ALL USING (company_id = get_my_company());
-
--- Public Access Policies (for landing pages of specific companies)
--- These use the companies.slug for filtering in the app, but for RLS we can allow based on slug or specific public flags
--- For simplicity, we allow reading if we have a public-facing slug check
--- Or better, allow SELECT if the user provides the correct company_id in the query
-CREATE POLICY "Public Read Lodges" ON lodges FOR SELECT USING (true);
-CREATE POLICY "Public Read Master Itineraries" ON master_itineraries FOR SELECT USING (true);
-CREATE POLICY "Public Read Agency Config" ON agency_config FOR SELECT USING (true);
-CREATE POLICY "Public Read Gallery Images" ON gallery_images FOR SELECT USING (true);
-CREATE POLICY "Public Read Team Members" ON team_members FOR SELECT USING (true);
-CREATE POLICY "Public Read Itineraries" ON itineraries FOR SELECT USING (true);
-CREATE POLICY "Public Read Payments" ON payments FOR SELECT USING (true);
-CREATE POLICY "Public Read Companies" ON companies FOR SELECT USING (true);
+-- Global Catalog Tables
 CREATE POLICY "Public Read Park Fees" ON park_fees FOR SELECT USING (true);
 CREATE POLICY "Public Read Activities" ON global_activities FOR SELECT USING (true);
 

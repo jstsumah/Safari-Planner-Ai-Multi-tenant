@@ -34,6 +34,34 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) {
+    console.warn("GEMINI_API_KEY is missing from environment variables.");
+  }
+
+  app.post('/api/generate-itinerary', async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      if (!prompt) return res.status(400).json({ message: 'Prompt is required' });
+      if (!GEMINI_API_KEY) return res.status(503).json({ message: 'AI service not configured' });
+
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI(GEMINI_API_KEY);
+      const model = ai.getGenerativeModel({ 
+        model: "gemini-1.5-flash",
+        generationConfig: { responseMimeType: "application/json" }
+      });
+
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text();
+      
+      return res.json(JSON.parse(responseText));
+    } catch (error: any) {
+      console.error("AI Generation Error:", error);
+      return res.status(500).json({ message: 'AI generation failed', error: error.message });
+    }
+  });
+
   const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
   const MAILERSEND_FROM_EMAIL = process.env.MAILERSEND_FROM_EMAIL;
 

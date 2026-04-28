@@ -349,17 +349,21 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchSystemBranding = async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('companies')
           .select('branding')
-          .eq('slug', 'system')
-          .single();
+          .eq('slug', 'system');
         
-        if (data?.branding) {
-          setSystemBranding(data.branding);
+        if (error) {
+          console.error("System branding fetch error:", error);
+          return;
         }
-      } catch {
-        console.warn("Global system branding not found, using defaults.");
+
+        if (data && data.length > 0) {
+          setSystemBranding(data[0].branding || DEFAULT_BRANDING);
+        }
+      } catch (err) {
+        console.error("Failed to load system branding:", err);
       }
     };
     fetchSystemBranding();

@@ -1,7 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
 import { SafariFormData, GeneratedItinerary } from "../types";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export async function generateSafariItinerary(data: SafariFormData): Promise<GeneratedItinerary> {
   const prompt = `
@@ -45,22 +42,21 @@ export async function generateSafariItinerary(data: SafariFormData): Promise<Gen
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json"
-      }
+    const response = await fetch('/api/generate-itinerary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
     });
-    
-    const text = response.text;
-    if (!text) throw new Error("Empty response from AI");
-    
-    const itinerary = JSON.parse(text);
-    return itinerary as GeneratedItinerary;
-  } catch (error) {
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.message || `Server error: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error: any) {
     console.error("AI Generation error:", error);
-    throw new Error("Unable to generate your safari at this moment. Please try again.", { cause: error });
+    throw new Error(error.message || "Unable to generate your safari at this moment. Please try again.");
   }
 }
 
