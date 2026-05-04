@@ -9,7 +9,7 @@ import {
   Calculator, Bookmark, FileCheck, Wand2,
   Wallet, Settings as SettingsIcon, Palette,
   Share2, Check, Users, UserPlus, Type, Image as ImageIcon, HelpCircle, Quote, Database,
-  ShieldAlert, ShieldCheck, Upload, TrendingUp, ArrowUpRight, BarChart3, Activity, Clock, ArrowLeft, Link
+  ShieldAlert, ShieldCheck, Upload, TrendingUp, ArrowUpRight, BarChart3, Activity, Clock, ArrowLeft, Link, Lock
 } from 'lucide-react';
 import { 
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
@@ -31,6 +31,7 @@ import DisbursementModule from './DisbursementModule';
 import PaymentVoucherModule from './PaymentVoucherModule';
 import ItineraryView from './ItineraryView';
 import SafariForm from './SafariForm';
+import { SubscriptionPage } from './SubscriptionPage';
 import { generateSafariItinerary } from '../services/aiService';
 
 import { Tooltip } from './ui/Tooltip';
@@ -251,6 +252,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [customRates, setCustomRates] = useState<LodgeCustomRate[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
   const [allProfiles, setAllProfiles] = useState<any[]>([]);
+  const [allTeamMembers, setAllTeamMembers] = useState<any[]>([]);
 
   // Derived Management Context State
   const managedCompany = useMemo(() => {
@@ -264,6 +266,43 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   }, [profile, managedCompany, company]);
 
   const effectiveCompanyId = effectiveCompany?.id;
+
+  // Subscription & Trial Logic - Robust detection
+  const subStatus = effectiveCompany?.branding?.subscription_status || 
+                   (effectiveCompany as any)?.subscription_status || 
+                   (profile as any)?.subscription_status;
+                   
+  const trialEndsAt = effectiveCompany?.branding?.trial_ends_at || 
+                      (effectiveCompany as any)?.trial_ends_at || 
+                      (profile as any)?.trial_ends_at;
+
+  const isTrial = subStatus === 'trial';
+  const trialExpired = isTrial && trialEndsAt && new Date(trialEndsAt) < new Date();
+  const daysRemaining = isTrial && trialEndsAt && !trialExpired
+    ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
+
+  const isRestricted = trialExpired && !profile?.is_super_user && activeTab !== 'subscription' && activeTab !== 'dashboard';
+
+  // Plan Usage Logic
+  const usageStats = useMemo(() => {
+    const isStarter = subStatus === 'starter';
+    const myLodges = lodges.filter(l => l.company_id === effectiveCompanyId).length;
+    const myItineraries = quotations.filter(q => q.company_id === effectiveCompanyId).length;
+    
+    return {
+      lodges: {
+        current: myLodges,
+        max: isStarter ? 5 : Infinity,
+        percent: isStarter ? Math.min(100, (myLodges / 5) * 100) : 0
+      },
+      itineraries: {
+        current: myItineraries,
+        max: isStarter ? 30 : Infinity,
+        percent: isStarter ? Math.min(100, (myItineraries / 30) * 100) : 0
+      }
+    };
+  }, [subStatus, lodges, quotations, effectiveCompanyId]);
 
   const navigateToTab = useCallback((tab: AdminTab) => {
     setActiveTab(tab);
@@ -384,6 +423,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       const { data: pros, error: pe } = await supabase.from('profiles').select('*').order('full_name');
       if (pe) throw pe;
       setAllProfiles(prev => JSON.stringify(prev) === JSON.stringify(pros || []) ? prev : (pros || []));
+
+      const { data: teams, error: te } = await supabase.from('team_members').select('*');
+      if (te) throw te;
+      setAllTeamMembers(prev => JSON.stringify(prev) === JSON.stringify(teams || []) ? prev : (teams || []));
     } catch (err: any) {
       console.error("Global fetch error:", err);
     }
@@ -990,11 +1033,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   };
 
   const handleNewLodge = () => {
+    if (subStatus === 'starter' && usageStats.lodges.current >= usageStats.lodges.max) {
+      toast.error("Cap reached: Upgrade to Unlimited to add more lodges.");
+      navigateToTab('subscription');
+      return;
+    }
     setSelectedLodge(null);
     navigateToTab('property_edit');
   };
 
   const handleNewQuote = () => {
+    if (subStatus === 'starter' && usageStats.itineraries.current >= usageStats.itineraries.max) {
+      toast.error("Monthly cap reached: Upgrade to Unlimited for unlimited AI itineraries.");
+      navigateToTab('subscription');
+      return;
+    }
     setQuoteSource(null);
     setNewQuoteData({
       clientName: '',
@@ -1168,16 +1221,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     }
     setIsLoading(true);
     try {
-      // Create user profile
-      const { error } = await supabase.from('profiles').insert([{
-        full_name: newUserData.full_name,
+      // Create team member entry which acts as an invitation
+      const { error } = await supabase.from('team_members').insert([{
+        name: newUserData.full_name,
         email: newUserData.email,
         company_id: newUserData.company_id || null,
-        user_type: newUserData.user_type,
-        is_super_user: false
+        role: newUserData.user_type === 'agency' ? 'Safari Consultant' : 'Associate'
       }]);
       if (error) throw error;
-      toast.success('User profile created. Click the mail icon on their card to email them an invite!');
+      toast.success('Invitation pending. Click the mail icon on their card in the Users list to send them an invite link!');
       setIsAddUserOpen(false);
       fetchGlobalData();
     } catch (err: any) {
@@ -1320,7 +1372,35 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         </div>
 
         <main className="flex-1 lg:overflow-y-auto bg-gray-50 pt-16 lg:pt-0 pb-32 lg:pb-0 overflow-x-hidden overflow-y-auto">
-          {profile?.is_super_user && (
+          {isRestricted ? (
+             <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center space-y-6 animate-fadeIn">
+                <div className="p-8 bg-red-50 rounded-full border-4 border-white shadow-xl">
+                  <Lock className="text-red-600" size={56} />
+                </div>
+                <div className="space-y-2">
+                  <h1 className="text-4xl font-black text-safari-900 tracking-tight">Access Restricted</h1>
+                  <p className="text-safari-500 max-w-md text-lg font-medium mx-auto">
+                    Your 14-day trial period for <span className="text-safari-900 font-bold">{effectiveCompany?.name || 'your agency'}</span> has ended. Please upgrade your subscription to continue using administrative features.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <button 
+                    onClick={() => navigateToTab('subscription')}
+                    className="bg-safari-900 text-white px-10 py-5 rounded-2xl font-black text-lg hover:bg-safari-800 transition-all shadow-2xl shadow-safari-300 transform hover:-translate-y-1"
+                  >
+                    View Subscription Plans
+                  </button>
+                  <button 
+                    onClick={() => navigateToTab('dashboard')}
+                    className="text-safari-500 font-bold hover:text-safari-900 transition-colors px-6 py-4"
+                  >
+                    Go Back to Overview
+                  </button>
+                </div>
+             </div>
+          ) : (
+            <div className="contents">
+              {profile?.is_super_user && (
             <div className="sticky top-0 z-[100] px-4 py-3 bg-white/80 backdrop-blur-md border-b border-safari-100 shadow-sm animate-fadeIn">
               <div className="max-w-[1600px] mx-auto flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4 flex-1">
@@ -1381,6 +1461,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
         {activeTab === 'dashboard' && (
           <div className="p-4 lg:p-8 space-y-8 animate-fadeIn max-w-[1600px] mx-auto">
+            {isTrial && (
+              <div className={`p-4 rounded-lg flex items-center justify-between border ${trialExpired ? 'bg-red-50 border-red-200 text-red-800' : 'bg-yellow-50 border-yellow-200 text-yellow-800'}`}>
+                <div>
+                   <h3 className="font-bold">{trialExpired ? 'Trial Period Expired' : 'Trial Period Active'}</h3>
+                   <p className="text-sm">
+                     {trialExpired 
+                       ? 'Your 14-day trial has ended. Please upgrade to continue using all features.' 
+                       : `You have ${daysRemaining} days left in your trial.`}
+                   </p>
+                </div>
+                <button onClick={() => navigateToTab('subscription')} className={`${trialExpired ? 'bg-red-600' : 'bg-yellow-500'} text-white px-4 py-2 rounded-lg font-bold hover:opacity-90 transition-opacity`}>
+                  {trialExpired ? 'Upgrade to Pro' : 'Upgrade Now'}
+                </button>
+              </div>
+            )}
 
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
               <div>
@@ -1405,12 +1500,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 <div className="h-8 w-px bg-safari-100" />
                 <div className="px-4">
                   <p className="text-[10px] font-black uppercase text-safari-400 tracking-widest">
-                    {managedCompanyId ? 'Company Status' : 'System Status'}
+                    Subscription Status
                   </p>
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                    <div className={`w-2 h-2 ${subStatus === 'active' ? 'bg-green-500' : (isTrial && !trialExpired) ? 'bg-yellow-500' : 'bg-red-500'} rounded-full`} />
                     <span className="text-xs font-black uppercase tracking-tight text-safari-900">
-                      {managedCompanyId ? (managedCompany?.status || 'Active') : 'Live'}
+                      {subStatus === 'trial' 
+                        ? (trialExpired ? 'Trial (Expired)' : 'Trial Period') 
+                        : (subStatus || 'Inactive')}
                     </span>
                   </div>
                 </div>
@@ -1452,6 +1549,74 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 positive={true}
               />
             </div>
+
+            {/* Plan Usage Section (Only for Capped/Essential Plan) */}
+            {subStatus === 'starter' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-safari-900 text-white rounded-3xl p-6 border border-safari-800 shadow-2xl relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 p-4 opacity-10">
+                  <Infinity size={120} />
+                </div>
+                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-8">
+                  <div className="max-w-xs">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Star size={16} className="text-yellow-400 fill-yellow-400" />
+                      <h3 className="text-xl font-black tracking-tight">Essential Plan</h3>
+                    </div>
+                    <p className="text-safari-400 text-sm font-medium leading-relaxed">
+                      You are using a capped plan. Upgrade to <span className="text-white font-bold">Unlimited</span> to remove all operational restrictions.
+                    </p>
+                    <button 
+                      onClick={() => navigateToTab('subscription')}
+                      className="mt-4 px-6 py-2 bg-yellow-400 text-safari-900 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-300 transition-all active:scale-95 shadow-lg shadow-yellow-400/20"
+                    >
+                      Remove All Caps
+                    </button>
+                  </div>
+
+                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    {/* Lodges Usage */}
+                    <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-safari-300">Lodges & Camps</span>
+                        <span className="text-xs font-bold">{usageStats.lodges.current} / {usageStats.lodges.max}</span>
+                      </div>
+                      <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                        <motion.div 
+                          className={`h-full rounded-full ${usageStats.lodges.percent > 90 ? 'bg-red-500' : 'bg-safari-100'}`}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${usageStats.lodges.percent}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-safari-500 font-bold mt-2 italic italic-tracking-tight">
+                        {usageStats.lodges.current >= usageStats.lodges.max ? 'Capacity reached.' : `${usageStats.lodges.max - usageStats.lodges.current} slots remaining.`}
+                      </p>
+                    </div>
+
+                    {/* Itinerary Usage */}
+                    <div className="bg-white/5 rounded-2xl p-4 border border-white/10">
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-safari-300">Monthly Itineraries</span>
+                        <span className="text-xs font-bold">{usageStats.itineraries.current} / {usageStats.itineraries.max}</span>
+                      </div>
+                      <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                        <motion.div 
+                          className={`h-full rounded-full ${usageStats.itineraries.percent > 90 ? 'bg-red-500' : 'bg-safari-100'}`}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${usageStats.itineraries.percent}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-safari-500 font-bold mt-2 italic italic-tracking-tight">
+                        Resets on the 1st of each month.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
               {/* Analytics Section */}
@@ -1701,6 +1866,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           <SuperHubView 
             companies={companies}
             allProfiles={allProfiles}
+            allTeamMembers={allTeamMembers}
             lodges={lodges}
             leads={leads}
             masterItineraries={masterItineraries}
@@ -1738,7 +1904,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             }}
             onUpdateCompanyScore={async (id: string, proficiencyScore: number) => {
               try {
-                const { error } = await supabase.from('companies').update({ proficiencyScore }).eq('id', id);
+                const { error } = await supabase.from('companies').update({ proficiency_score: proficiencyScore }).eq('id', id);
                 if (error) throw error;
                 toast.success(`Proficiency score updated.`);
                 fetchGlobalData();
@@ -3273,7 +3439,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             />
           </div>
         )}
-      </main>
+        {activeTab === 'subscription' && (
+          <div className="p-8 h-full">
+            <SubscriptionPage />
+          </div>
+        )}
+      </div>
+    )}
+  </main>
       
       {/* Mobile Bottom Navigation - Fixed for all pages */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-20 bg-white border-t border-safari-100 flex items-center justify-around px-4 z-40 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
@@ -3810,6 +3983,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 const SuperHubView = ({ 
   companies, 
   allProfiles, 
+  allTeamMembers = [],
   lodges, 
   leads,
   masterItineraries,
@@ -4020,15 +4194,29 @@ const SuperHubView = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-safari-50">
-              {allProfiles.map((p: any) => {
-                const userCompany = companies.find((c: any) => c.id === p.company_id);
-                return (
-                  <tr key={p.id} className="hover:bg-safari-50/50 transition-colors">
-                    <td className="px-8 py-6">
-                      <p className="font-black text-safari-900">{p.full_name}</p>
-                      <p className="text-xs text-safari-500 font-medium">{p.email}</p>
-                    </td>
-                    <td className="px-8 py-6">
+              {(() => {
+                // Combine profiles and team members who haven't registered yet
+                const combined = [
+                  ...allProfiles.map(p => ({ ...p, isRegistered: true })),
+                  ...allTeamMembers
+                    .filter(tm => !allProfiles.some(p => p.email === tm.email))
+                    .map(tm => ({ ...tm, full_name: tm.name, isRegistered: false }))
+                ].sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+
+                return combined.map((p: any) => {
+                  const userCompany = companies.find((c: any) => c.id === p.company_id);
+                  return (
+                    <tr key={p.id} className="hover:bg-safari-50/50 transition-colors">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-2">
+                          <p className="font-black text-safari-900">{p.full_name}</p>
+                          {!p.isRegistered && (
+                            <span className="px-1.5 py-0.5 bg-safari-100 text-safari-400 rounded text-[8px] font-black uppercase tracking-widest">Pending</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-safari-500 font-medium">{p.email}</p>
+                      </td>
+                      <td className="px-8 py-6">
                       {userCompany ? (
                         <div className="flex items-center gap-2">
                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -4083,8 +4271,9 @@ const SuperHubView = ({
                     </td>
                   </tr>
                 );
-              })}
-            </tbody>
+              })
+            })()}
+          </tbody>
           </table>
         </div>
       )}

@@ -10,6 +10,9 @@ import CostingModule from './components/CostingModule';
 import Onboarding from './components/Onboarding';
 import CompanyProfile from './components/CompanyProfile';
 import PartnersPage from './components/PartnersPage';
+import { SubscriptionPage } from './components/SubscriptionPage';
+import { PayPalSuccess } from './components/PayPalSuccess';
+import { PayPalCancel } from './components/PayPalCancel';
 import { useAuth } from './hooks/useAuth';
 import { SafariFormData, GeneratedItinerary, Lodge, BudgetTier, TransportType, BrandingConfig } from './types';
 import { generateSafariItinerary } from './services/aiService';
@@ -188,7 +191,10 @@ const App: React.FC = () => {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const [viewMode, setViewMode] = useState<'landing' | 'form' | 'itinerary' | 'history' | 'admin' | 'calculator' | 'auth' | 'partners'>(() => {
+  const [viewMode, setViewMode] = useState<'landing' | 'form' | 'itinerary' | 'history' | 'admin' | 'calculator' | 'auth' | 'partners' | 'subscription' | 'success' | 'cancel'>(() => {
+    if (window.location.pathname === '/success') return 'success';
+    if (window.location.pathname === '/cancel') return 'cancel';
+
     const params = new URLSearchParams(window.location.search);
     if (params.get('auth') || params.get('invite')) return 'auth';
     if (params.get('master') || params.get('itin')) return 'itinerary';
@@ -197,7 +203,7 @@ const App: React.FC = () => {
 
     // Priority: Saved viewMode if we were already in an active session
     const savedView = sessionStorage.getItem('safari_viewMode');
-    if (savedView && ['form', 'itinerary', 'history', 'admin', 'calculator', 'partners'].includes(savedView)) {
+    if (savedView && ['form', 'itinerary', 'history', 'admin', 'calculator', 'partners', 'subscription', 'success', 'cancel'].includes(savedView)) {
       return savedView as any;
     }
 
@@ -679,6 +685,18 @@ const App: React.FC = () => {
           onClose={navigateHome} 
         />
       );
+    }
+
+    if (viewMode === 'subscription') {
+      return <SubscriptionPage />;
+    }
+    
+    if (viewMode === 'success') {
+      return <PayPalSuccess />;
+    }
+    
+    if (viewMode === 'cancel') {
+      return <PayPalCancel />;
     }
 
     if (viewMode === 'calculator') {

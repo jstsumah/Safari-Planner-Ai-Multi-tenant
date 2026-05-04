@@ -30,6 +30,9 @@ export interface Company {
   proficiencyScore?: number; // 1-100 rating
   created_at?: string;
   updated_at?: string;
+  subscription_status?: 'trial' | 'active' | 'inactive';
+  trial_ends_at?: string;
+  subscription_tier?: 'starter' | 'pro';
 }
 
 export interface Profile {

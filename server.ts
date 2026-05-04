@@ -7,9 +7,45 @@ import compression from 'compression';
 import helmet from 'helmet';
 import { expand } from 'dotenv-expand';
 import { createServer as createViteServer } from 'vite';
+import paypal from 'paypal-rest-sdk';
 
-const myEnv = dotenv.config();
-expand(myEnv);
+// Load environment variables
+dotenv.config();
+// Fallback to .env.example if running in dev and .env is missing or incomplete
+if (process.env.NODE_ENV !== 'production') {
+  const examplePath = path.join(process.cwd(), '.env.example');
+  const exampleEnv = dotenv.config({ path: examplePath });
+  if (exampleEnv.parsed) {
+    Object.keys(exampleEnv.parsed).forEach(key => {
+      const val = exampleEnv.parsed![key];
+      if (val && (!process.env[key] || process.env[key] === '')) {
+        process.env[key] = val;
+      }
+    });
+  }
+}
+const myEnv = { parsed: process.env }; // Mock the object for expand
+expand(myEnv as any);
+
+const PAYPAL_MODE = (process.env.PAYPAL_MODE || 'sandbox').trim().toLowerCase();
+const PAYPAL_CLIENT_ID = (process.env.PAYPAL_CLIENT_ID || '').trim();
+const PAYPAL_CLIENT_SECRET = (process.env.PAYPAL_CLIENT_SECRET || '').trim();
+
+console.log('--- PayPal Config Diagnostic ---');
+console.log(`MODE: [${PAYPAL_MODE}]`);
+console.log(`CLIENT_ID: [${PAYPAL_CLIENT_ID.substring(0, 10)}...] (len: ${PAYPAL_CLIENT_ID.length})`);
+console.log(`SECRET: [${PAYPAL_CLIENT_SECRET.substring(0, 10)}...] (len: ${PAYPAL_CLIENT_SECRET.length})`);
+console.log('--------------------------------');
+
+if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
+  console.warn("CRITICAL: PAYPAL_CLIENT_ID or PAYPAL_CLIENT_SECRET is missing.");
+}
+
+paypal.configure({
+  mode: PAYPAL_MODE as any,
+  client_id: PAYPAL_CLIENT_ID,
+  client_secret: PAYPAL_CLIENT_SECRET
+});
 
 // __filename and __dirname removed (unused warning)
 
@@ -32,6 +68,68 @@ async function startServer() {
 
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  app.post('/api/paypal/create-order', (req, res) => {
+    const { plan, companyId } = req.body;
+    const price = plan === 'pro' ? '60.00' : '30.00';
+    
+    if (!companyId) {
+      return res.status(400).json({ error: 'companyId is required' });
+    }
+    
+    const create_payment_json = {
+        "intent": "sale",
+        "payer": { "payment_method": "paypal" },
+        "redirect_urls": {
+          "return_url": `${process.env.APP_URL}/success?companyId=${companyId}`,
+          "cancel_url": `${process.env.APP_URL}/cancel`
+        },
+        "transactions": [{
+          "item_list": {
+            "items": [{
+              "name": `${plan} Subscription`,
+              "sku": plan,
+              "price": price,
+              "currency": "USD",
+              "quantity": 1
+            }]
+          },
+          "amount": { "currency": "USD", "total": price },
+          "description": `Subscription to ${plan} plan.`
+        }]
+    };
+
+    paypal.payment.create(create_payment_json, (error: any, payment: any) => {
+        if (error) {
+            console.error('PayPal Create Payment Error:', JSON.stringify(error, null, 2));
+            const errorMessage = error.response?.message || error.message || 'Failed to create PayPal payment';
+            res.status(500).json({ error: errorMessage, details: error.response });
+        } else {
+            for (let i = 0; i < payment.links.length; i++) {
+                if (payment.links[i].rel === 'approval_url') {
+                    res.json({ approvalUrl: payment.links[i].href });
+                }
+            }
+        }
+    });
+  });
+
+  app.post('/api/paypal/capture-order', (req, res) => {
+    const { paymentId, payerId } = req.body;
+    const execute_payment_json = {
+      "payer_id": payerId
+    };
+
+    paypal.payment.execute(paymentId, execute_payment_json, (error: any, payment) => {
+      if (error) {
+        console.error('PayPal Execute Payment Error:', JSON.stringify(error, null, 2));
+        const errorMessage = error.response?.message || error.message || 'Failed to execute PayPal payment';
+        res.status(500).json({ error: errorMessage, details: error.response });
+      } else {
+        res.json({ payment });
+      }
+    });
   });
 
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;

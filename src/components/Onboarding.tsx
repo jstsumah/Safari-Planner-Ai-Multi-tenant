@@ -74,8 +74,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
             company_id: teamMember.company_id,
             full_name: fullName || currentUser.user_metadata?.full_name || teamMember.name,
             email: currentUser.email,
-            user_type: currentUser.user_metadata?.user_type || 'agency', // Default to agency if not specified
-            role: 'staff' // Default to staff for invited team members
+            user_type: currentUser.user_metadata?.user_type || 'agency',
+            role: 'staff'
           }]);
           
         if (profileError && profileError.code !== '23505') { // Ignore if already registered
@@ -180,6 +180,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
               id: data.user.id,
               full_name: fullName,
               email: email,
+              user_type: 'user',
               role: 'user'
             }]);
           if (profileError) throw profileError;
@@ -294,7 +295,13 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
         .insert([{
           name: companyName,
           slug: slug,
-          branding: { ...INITIAL_BRANDING, appName: companyName, contactEmail: currentUser.email }
+          branding: { 
+            ...INITIAL_BRANDING, 
+            appName: companyName, 
+            contactEmail: currentUser.email,
+            subscription_status: 'trial',
+            trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+          }
         }])
         .select()
         .single();
@@ -309,6 +316,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
           company_id: company.id,
           full_name: fullName || currentUser.user_metadata?.full_name || 'Admin',
           email: currentUser.email!,
+          user_type: regType,
           role: 'admin'
         }]);
 

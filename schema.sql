@@ -3,7 +3,9 @@
 -- Helper function to check if current user is super user
 CREATE OR REPLACE FUNCTION is_super_user()
 RETURNS BOOLEAN AS $$
-  SELECT is_super_user FROM profiles WHERE id = auth.uid();
+  SELECT COALESCE(is_super_user, false) OR (email = 'innovateitsolutions4@gmail.com') 
+  FROM profiles 
+  WHERE id = auth.uid();
 $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
 
 -- Helper function to get current company_id
@@ -21,6 +23,10 @@ CREATE TABLE IF NOT EXISTS companies (
     branding JSONB,
     is_landing_enabled BOOLEAN DEFAULT true,
     status TEXT DEFAULT 'active',
+    subscription_status TEXT DEFAULT 'trial', -- trial, active, inactive
+    trial_ends_at TIMESTAMPTZ,
+    subscription_tier TEXT DEFAULT 'starter', -- starter, pro
+    proficiency_score INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -31,6 +37,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE,
     full_name TEXT,
     email TEXT UNIQUE NOT NULL,
+    user_type TEXT DEFAULT 'agency', -- agency, user, provider
     role TEXT DEFAULT 'staff', -- admin, staff
     is_super_user BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT now(),
@@ -213,7 +220,8 @@ CREATE POLICY "Super User Global Access - Itineraries" ON itineraries FOR ALL US
 CREATE POLICY "Super User Global Access - Payments" ON payments FOR ALL USING (is_super_user());
 CREATE POLICY "Super User Global Access - Agency Config" ON agency_config FOR ALL USING (is_super_user());
 CREATE POLICY "Super User Global Access - Gallery Images" ON gallery_images FOR ALL USING (is_super_user());
-CREATE POLICY "Super User Global Access - Team Members" ON team_members FOR ALL USING (is_super_user());
+CREATE POLICY "Admins can manage team members of their company" ON team_members FOR ALL USING (company_id = get_my_company()) WITH CHECK (company_id = get_my_company());
+CREATE POLICY "Super admins can manage all team members" ON team_members FOR ALL USING (is_super_user()) WITH CHECK (is_super_user());
 CREATE POLICY "Super User Global Access - Custom Rates" ON lodge_custom_rates FOR ALL USING (is_super_user());
 CREATE POLICY "Super User Global Access - Park Fees" ON park_fees FOR ALL USING (is_super_user());
 CREATE POLICY "Super User Global Access - Activities" ON global_activities FOR ALL USING (is_super_user());
@@ -241,7 +249,6 @@ CREATE POLICY "Company Data Isolation - Itineraries" ON itineraries FOR ALL USIN
 
 -- Team Members
 CREATE POLICY "Public Read Team Members" ON team_members FOR SELECT USING (true);
-CREATE POLICY "Company Data Isolation - Team Members" ON team_members FOR ALL USING (company_id = get_my_company());
 
 -- Reviews
 CREATE POLICY "Public Read Reviews" ON reviews FOR SELECT USING (true);
