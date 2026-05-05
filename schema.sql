@@ -226,6 +226,14 @@ CREATE POLICY "Super User Global Access - Custom Rates" ON lodge_custom_rates FO
 CREATE POLICY "Super User Global Access - Park Fees" ON park_fees FOR ALL USING (is_super_user());
 CREATE POLICY "Super User Global Access - Activities" ON global_activities FOR ALL USING (is_super_user());
 
+-- RPC to check if email exists (for onboarding flow)
+CREATE OR REPLACE FUNCTION public.check_email_exists(email_to_check TEXT)
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (SELECT 1 FROM profiles WHERE LOWER(email) = LOWER(email_to_check));
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
 -- Companies: Public Read, Authenticated Management
 CREATE POLICY "Public Read Companies" ON companies FOR SELECT USING (true);
 CREATE POLICY "Admins can update their own company" ON companies FOR UPDATE USING (id = get_my_company());

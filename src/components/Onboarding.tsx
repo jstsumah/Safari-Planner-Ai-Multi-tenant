@@ -37,6 +37,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
   const [view, setView] = useState<'auth' | 'company' | 'forgot' | 'reset'>('auth');
   const [step, setStep] = useState(1);
   const [isSignUp, setIsSignUp] = useState(initialMode === 'signup');
+  const [showPasswordField, setShowPasswordField] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -184,12 +185,45 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
               role: 'user'
             }]);
           if (profileError) throw profileError;
-          await refreshProfile();
-          if (onComplete) onComplete('user');
+          setSuccess("Account created! Please sign in with your credentials.");
+          setIsSignUp(false);
+          setStep(1);
+          setShowPasswordField(false);
+          setEmail(email); // Keep email for convenience
+          setPassword('');
+          await supabase.auth.signOut();
           return;
         }
         // Now that we have the user, we create the company and profile
         await finalizeOnboarding(data.user);
+      }
+    } catch (err: any) {
+      setError(formatAuthError(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailCheck = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: exists, error } = await supabase
+        .rpc('check_email_exists', { email_to_check: email.trim().toLowerCase() });
+
+      if (error) throw error;
+
+      if (exists) {
+        setShowPasswordField(true);
+      } else {
+        setError("Account not found. Please sign up to create your agency.");
+        setTimeout(() => {
+          setIsSignUp(true);
+          setStep(1);
+          setError(null);
+        }, 2000);
       }
     } catch (err: any) {
       setError(formatAuthError(err));
@@ -256,6 +290,11 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
     }
   };
 
+  const updateSlugFromName = (name: string) => {
+    const slug = name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').trim();
+    setCompanySlug(slug);
+  };
+
   const handleCompanySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -273,7 +312,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
         .limit(1);
 
       if (existingCompany && existingCompany.length > 0) {
-        throw new Error("This URL slug is already taken. Please choose another one.");
+        throw new Error("This company web address (slug) is already taken. Please try a slightly different company name to generate a unique URL.");
       }
 
       // If slug is okay, proceed to next step (User signup)
@@ -334,8 +373,17 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
           photo_url: currentUser.user_metadata?.avatar_url || ''
         }]);
 
-      await refreshProfile();
-      if (onComplete) onComplete(regType);
+      if (isSignUp) {
+        setSuccess("Agency setup complete! Please sign in with your credentials to access your dashboard.");
+        setIsSignUp(false);
+        setStep(1);
+        setShowPasswordField(false);
+        setPassword('');
+        await supabase.auth.signOut();
+      } else {
+        await refreshProfile();
+        if (onComplete) onComplete(regType);
+      }
     } catch (err: any) {
       console.error("Finalization error:", err);
       setError("Account created but company setup failed. Please contact support.");
@@ -497,7 +545,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                         type="text"
                         required={regType !== 'user'}
                         value={companyName}
-                        onChange={(e) => setCompanyName(e.target.value)}
+                        onChange={(e) => {
+                          setCompanyName(e.target.value);
+                          updateSlugFromName(e.target.value);
+                        }}
                         className="w-full px-5 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                         placeholder={regType === 'provider' ? "e.g. Serengeti Tours" : "e.g. Serengeti Luxury Lodge"}
                       />
@@ -505,15 +556,14 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                     <div>
                       <label className="block text-[10px] font-black uppercase tracking-widest text-safari-600 mb-2 px-1">Handled Slug (URL)</label>
                       <div className="text-safari-400 text-[10px] mb-2 font-bold px-1 truncate">
-                        safariplanner.ai/{regType === 'provider' ? 'operator' : 'accommodation'}/<span className="text-safari-900">{companySlug || '...'}</span>
+                        safariplanner.ai/{regType === 'provider' ? 'operator' : 'accommodation'}/<span className="text-safari-900 font-black">{companySlug || '...'}</span>
                       </div>
                       <input
                         type="text"
-                        required={regType !== 'user'}
+                        readOnly
                         value={companySlug}
-                        onChange={(e) => setCompanySlug(e.target.value)}
-                        className="w-full px-5 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
-                        placeholder={regType === 'provider' ? "safari-operator" : "luxury-lodge"}
+                        className="w-full px-5 py-3 bg-safari-50/50 border border-safari-100 rounded-lg outline-none cursor-not-allowed font-bold text-sm text-safari-400"
+                        placeholder="Auto-generated from name"
                       />
                     </div>
                   </motion.div>
@@ -633,7 +683,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 1.05 }}
-                onSubmit={handleSignIn}
+                onSubmit={showPasswordField ? handleSignIn : handleEmailCheck}
                 className="space-y-4"
               >
                 <div>
@@ -644,58 +694,74 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                       type="email"
                       required
                       value={email}
+                      readOnly={showPasswordField}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
+                      className={`w-full pl-12 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm ${
+                        showPasswordField 
+                          ? 'bg-safari-50/50 border-safari-100 text-safari-400 cursor-not-allowed' 
+                          : 'bg-white/50 border-white/60 focus:bg-white'
+                      }`}
                       placeholder="email@agency.com"
                     />
+                    {showPasswordField && (
+                      <button 
+                        type="button"
+                        onClick={() => setShowPasswordField(false)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black uppercase tracking-widest text-safari-400 hover:text-safari-900"
+                      >
+                        Change
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div>
-                  <div className="flex justify-between items-center mb-2 px-1">
-                    <label className="block text-[10px] font-black uppercase tracking-widest text-safari-600">Password</label>
-                    <button 
-                      type="button"
-                      onClick={() => setView('forgot')}
-                      className="text-[10px] font-black uppercase tracking-widest text-safari-400 hover:text-safari-900 transition-colors"
-                    >
-                      Forgot?
-                    </button>
-                  </div>
-                  <div className="relative group">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-safari-400 group-focus-within:text-safari-600 transition-colors" size={18} />
-                    <input
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
-                      placeholder="••••••••"
-                    />
-                  </div>
-                </div>
+
+                {showPasswordField && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    <div className="flex justify-between items-center mb-2 px-1">
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-safari-600">Password</label>
+                      <button 
+                        type="button"
+                        onClick={() => setView('forgot')}
+                        className="text-[10px] font-black uppercase tracking-widest text-safari-400 hover:text-safari-900 transition-colors"
+                      >
+                        Forgot?
+                      </button>
+                    </div>
+                    <div className="relative group">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-safari-400 group-focus-within:text-safari-600 transition-colors" size={18} />
+                      <input
+                        type="password"
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
+                        placeholder="••••••••"
+                        autoFocus
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
                 {error && <p className="text-red-600 text-xs font-bold bg-red-50/50 backdrop-blur-md p-4 rounded-lg border border-red-100/50">{error}</p>}
+                {success && <p className="text-green-600 text-xs font-bold bg-green-50/50 backdrop-blur-md p-4 rounded-lg border border-green-100/50">{success}</p>}
+                
                 <button
                   type="submit"
                   disabled={loading}
                   className="w-full py-4 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
                 >
-                  {loading ? <Loader2 className="animate-spin" /> : 'Sign In'}
-                  <ArrowRight size={18} />
+                  {loading ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <>
+                      {showPasswordField ? 'Sign In' : 'Continue'}
+                      <ArrowRight size={18} />
+                    </>
+                  )}
                 </button>
-                <div className="text-center pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsSignUp(true);
-                      setStep(1);
-                      setView('auth');
-                      setError(null);
-                    }}
-                    className="text-safari-900 font-black text-[10px] uppercase tracking-widest hover:underline"
-                  >
-                    New company? Get Started
-                  </button>
-                </div>
               </motion.form>
             )}
 
@@ -745,7 +811,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                     type="text"
                     required
                     value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
+                    onChange={(e) => {
+                      setCompanyName(e.target.value);
+                      updateSlugFromName(e.target.value);
+                    }}
                     className="w-full px-5 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                     placeholder={regType === 'provider' ? "e.g. Serengeti Tours" : "e.g. Serengeti Luxury Lodge"}
                   />
@@ -753,15 +822,14 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-safari-600 mb-2 px-1">Handled Slug (URL)</label>
                   <div className="text-safari-400 text-[10px] mb-2 font-bold px-1 truncate">
-                    safariplanner.ai/{regType === 'provider' ? 'operator' : 'accommodation'}/<span className="text-safari-900">{companySlug || '...'}</span>
+                    safariplanner.ai/{regType === 'provider' ? 'operator' : 'accommodation'}/<span className="text-safari-900 font-black">{companySlug || '...'}</span>
                   </div>
                   <input
                     type="text"
-                    required
+                    readOnly
                     value={companySlug}
-                    onChange={(e) => setCompanySlug(e.target.value)}
-                    className="w-full px-5 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
-                    placeholder={regType === 'provider' ? "safari-operator" : "luxury-lodge"}
+                    className="w-full px-5 py-3 bg-safari-50/50 border border-safari-100 rounded-lg outline-none cursor-not-allowed font-bold text-sm text-safari-400"
+                    placeholder="Auto-generated from name"
                   />
                 </div>
                 {error && <p className="text-red-500 text-sm font-bold bg-red-50/50 backdrop-blur-md p-4 rounded-lg">{error}</p>}

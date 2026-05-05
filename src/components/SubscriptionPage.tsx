@@ -17,7 +17,7 @@ export const SubscriptionPage = () => {
     const toastId = toast.loading('Initiating secure checkout...');
 
     try {
-      const response = await fetch('/api/paypal/create-order', {
+      const response = await fetch('/api/pesapal/submit-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan, companyId: company.id })
@@ -29,11 +29,11 @@ export const SubscriptionPage = () => {
         throw new Error(data.error || 'Failed to initialize payment');
       }
 
-      if (data.approvalUrl) {
-        toast.success('Redirecting to PayPal...', { id: toastId });
-        window.location.href = data.approvalUrl;
+      if (data.redirect_url) {
+        toast.success('Redirecting to PesaPal...', { id: toastId });
+        window.location.href = data.redirect_url;
       } else {
-        throw new Error('No approval URL returned from PayPal');
+        throw new Error('No redirect URL returned from PesaPal');
       }
     } catch (error: any) {
       console.error('Subscription error:', error);

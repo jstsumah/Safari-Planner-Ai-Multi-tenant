@@ -7,7 +7,6 @@ import compression from 'compression';
 import helmet from 'helmet';
 import { expand } from 'dotenv-expand';
 import { createServer as createViteServer } from 'vite';
-import paypal from 'paypal-rest-sdk';
 
 // Load environment variables
 dotenv.config();
@@ -27,28 +26,45 @@ if (process.env.NODE_ENV !== 'production') {
 const myEnv = { parsed: process.env }; // Mock the object for expand
 expand(myEnv as any);
 
-const PAYPAL_MODE = (process.env.PAYPAL_MODE || 'sandbox').trim().toLowerCase();
-const PAYPAL_CLIENT_ID = (process.env.PAYPAL_CLIENT_ID || '').trim();
-const PAYPAL_CLIENT_SECRET = (process.env.PAYPAL_CLIENT_SECRET || '').trim();
+const PESAPAL_CONSUMER_KEY = (process.env.PESAPAL_CONSUMER_KEY || '').trim();
+const PESAPAL_CONSUMER_SECRET = (process.env.PESAPAL_CONSUMER_SECRET || '').trim();
+const PESAPAL_MODE = (process.env.PESAPAL_MODE || 'sandbox').trim().toLowerCase();
+const PESAPAL_IPN_ID = (process.env.PESAPAL_IPN_ID || '').trim();
 
-console.log('--- PayPal Config Diagnostic ---');
-console.log(`MODE: [${PAYPAL_MODE}]`);
-console.log(`CLIENT_ID: [${PAYPAL_CLIENT_ID.substring(0, 10)}...] (len: ${PAYPAL_CLIENT_ID.length})`);
-console.log(`SECRET: [${PAYPAL_CLIENT_SECRET.substring(0, 10)}...] (len: ${PAYPAL_CLIENT_SECRET.length})`);
+const PESAPAL_URL = PESAPAL_MODE === 'production' 
+  ? 'https://pay.pesapal.com/v3'
+  : 'https://cybqa.pesapal.com/pesapalv3';
+
+console.log('--- PesaPal Config Diagnostic ---');
+console.log(`MODE: [${PESAPAL_MODE}]`);
+console.log(`BASE_URL: [${PESAPAL_URL}]`);
+console.log(`KEY: [${PESAPAL_CONSUMER_KEY.substring(0, 5)}...]`);
 console.log('--------------------------------');
 
-if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
-  console.warn("CRITICAL: PAYPAL_CLIENT_ID or PAYPAL_CLIENT_SECRET is missing.");
+async function getPesaPalToken() {
+  if (!PESAPAL_CONSUMER_KEY || !PESAPAL_CONSUMER_SECRET) {
+    throw new Error('PesaPal credentials missing');
+  }
+
+  const response = await fetch(`${PESAPAL_URL}/api/Auth/RequestToken`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify({
+      consumer_key: PESAPAL_CONSUMER_KEY,
+      consumer_secret: PESAPAL_CONSUMER_SECRET
+    })
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error?.message || 'Failed to authenticate with PesaPal');
+  }
+
+  return data.token;
 }
-
-paypal.configure({
-  mode: PAYPAL_MODE as any,
-  client_id: PAYPAL_CLIENT_ID,
-  client_secret: PAYPAL_CLIENT_SECRET
-});
-
-// __filename and __dirname removed (unused warning)
-
 
 async function startServer() {
   const app = express();
@@ -70,66 +86,176 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  app.post('/api/paypal/create-order', (req, res) => {
-    const { plan, companyId } = req.body;
-    const price = plan === 'pro' ? '60.00' : '30.00';
+  app.post('/api/pesapal/submit-order', async (req, res) => {
+    const { plan, companyId, email } = req.body;
+    const amount = plan === 'pro' ? 60.00 : 30.00;
     
     if (!companyId) {
       return res.status(400).json({ error: 'companyId is required' });
     }
-    
-    const create_payment_json = {
-        "intent": "sale",
-        "payer": { "payment_method": "paypal" },
-        "redirect_urls": {
-          "return_url": `${process.env.APP_URL}/success?companyId=${companyId}`,
-          "cancel_url": `${process.env.APP_URL}/cancel`
-        },
-        "transactions": [{
-          "item_list": {
-            "items": [{
-              "name": `${plan} Subscription`,
-              "sku": plan,
-              "price": price,
-              "currency": "USD",
-              "quantity": 1
-            }]
-          },
-          "amount": { "currency": "USD", "total": price },
-          "description": `Subscription to ${plan} plan.`
-        }]
-    };
 
-    paypal.payment.create(create_payment_json, (error: any, payment: any) => {
-        if (error) {
-            console.error('PayPal Create Payment Error:', JSON.stringify(error, null, 2));
-            const errorMessage = error.response?.message || error.message || 'Failed to create PayPal payment';
-            res.status(500).json({ error: errorMessage, details: error.response });
-        } else {
-            for (let i = 0; i < payment.links.length; i++) {
-                if (payment.links[i].rel === 'approval_url') {
-                    res.json({ approvalUrl: payment.links[i].href });
-                }
-            }
+    if (!PESAPAL_IPN_ID) {
+      return res.status(500).json({ error: 'PESAPAL_IPN_ID is not configured. Please register an IPN URL in PesaPal dashboard.' });
+    }
+    
+    try {
+      const token = await getPesaPalToken();
+      const merchantReference = `SP-${companyId.substring(0, 8)}-${Date.now()}`;
+      
+      const payload = {
+        id: merchantReference,
+        currency: "USD",
+        amount: amount,
+        description: `SafariPlanner ${plan} Plan Subscription`,
+        callback_url: `${process.env.APP_URL}/subscription/callback`,
+        notification_id: PESAPAL_IPN_ID,
+        billing_address: {
+          email_address: email || "billing@wildrhythm.com",
+          phone_number: "",
+          country_code: "",
+          first_name: "Customer",
+          middle_name: "",
+          last_name: companyId.substring(0, 8),
+          line_1: "",
+          line_2: "",
+          city: "",
+          state: "",
+          postal_code: "",
+          zip_code: ""
         }
-    });
+      };
+
+      const response = await fetch(`${PESAPAL_URL}/api/Transactions/SubmitOrderRequest`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'PesaPal SubmitOrderRequest failed');
+      }
+
+      res.json({ redirect_url: data.redirect_url, order_tracking_id: data.order_tracking_id });
+    } catch (error: any) {
+      console.error('PesaPal Submit Order Error:', error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
-  app.post('/api/paypal/capture-order', (req, res) => {
-    const { paymentId, payerId } = req.body;
-    const execute_payment_json = {
-      "payer_id": payerId
-    };
+  app.get('/api/pesapal/transaction-status', async (req, res) => {
+    const { OrderTrackingId } = req.query;
+    if (!OrderTrackingId) return res.status(400).json({ error: 'OrderTrackingId is required' });
 
-    paypal.payment.execute(paymentId, execute_payment_json, (error: any, payment) => {
-      if (error) {
-        console.error('PayPal Execute Payment Error:', JSON.stringify(error, null, 2));
-        const errorMessage = error.response?.message || error.message || 'Failed to execute PayPal payment';
-        res.status(500).json({ error: errorMessage, details: error.response });
-      } else {
-        res.json({ payment });
+    try {
+      const token = await getPesaPalToken();
+      const response = await fetch(`${PESAPAL_URL}/api/Transactions/GetTransactionStatus?orderTrackingId=${OrderTrackingId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error?.message || 'Failed to get PesaPal transaction status');
       }
-    });
+
+      res.json(data);
+    } catch (error: any) {
+      console.error('PesaPal Status Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // HELPER TO GET IPN ID: Visit this URL to get your IPN_ID
+  app.get('/api/pesapal/register-ipn', async (req, res) => {
+    try {
+      const token = await getPesaPalToken();
+      const ipnUrl = "https://safariplanner.style-upsystems.com/api/pesapal/ipn";
+      
+      const response = await fetch(`${PESAPAL_URL}/api/URLRegistration/RegisterIPN`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          url: ipnUrl,
+          ipn_notification_type: "GET"
+        })
+      });
+
+      const data = await response.json();
+      res.json({ 
+        message: "Use the IPN_ID below in your .env file",
+        ipn_id: data.ipn_id,
+        raw_response: data 
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get('/api/pesapal/ipn', async (req, res) => {
+    const { OrderTrackingId, OrderNotificationType, OrderMerchantReference } = req.query;
+    
+    console.log('--- PesaPal IPN Received (GET) ---');
+    console.log(`Tracking ID: ${OrderTrackingId}`);
+    console.log(`Type: ${OrderNotificationType}`);
+    console.log(`Reference: ${OrderMerchantReference}`);
+
+    if (!OrderTrackingId) {
+      return res.status(400).send('Missing Tracking ID');
+    }
+
+    try {
+      // 1. Get Token
+      const token = await getPesaPalToken();
+      
+      // 2. Query PesaPal for the actual status
+      const response = await fetch(`${PESAPAL_URL}/api/Transactions/GetTransactionStatus?orderTrackingId=${OrderTrackingId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      const statusData = await response.json();
+      
+      if (response.ok && statusData.payment_status_description === 'Success') {
+        console.log(`Transaction ${OrderTrackingId} verified as SUCCESS.`);
+        
+        // Extract company ID from merchant reference (e.g., SP-uuid-timestamp)
+        const refParts = (OrderMerchantReference as string || '').split('-');
+        if (refParts.length >= 2) {
+          // Note: In a real implementation we would update the DB here
+          // We don't have the full company UUID in the ref necessarily, 
+          // so we'd typically query by reference.
+          console.log(`Ready to update subscription for reference: ${OrderMerchantReference}`);
+        }
+      }
+
+      // 3. Acknowledge the IPN to PesaPal
+      // PesaPal expects a specific JSON response to acknowledge receipt
+      res.json({
+        "orderNotificationType": OrderNotificationType,
+        "orderTrackingId": OrderTrackingId,
+        "orderMerchantReference": OrderMerchantReference,
+        "status": 200
+      });
+
+    } catch (error) {
+      console.error('Error processing PesaPal IPN:', error);
+      res.status(500).send('Internal Server Error');
+    }
   });
 
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
