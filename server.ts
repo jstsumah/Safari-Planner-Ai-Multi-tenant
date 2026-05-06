@@ -28,17 +28,21 @@ expand(myEnv as any);
 
 const PESAPAL_CONSUMER_KEY = (process.env.PESAPAL_CONSUMER_KEY || '').trim();
 const PESAPAL_CONSUMER_SECRET = (process.env.PESAPAL_CONSUMER_SECRET || '').trim();
-const PESAPAL_MODE = (process.env.PESAPAL_MODE || 'sandbox').trim().toLowerCase();
+const PESAPAL_RAW_MODE = (process.env.PESAPAL_MODE || 'sandbox').trim().toLowerCase();
+const PESAPAL_MODE = (PESAPAL_RAW_MODE === 'production' || PESAPAL_RAW_MODE === 'live') ? 'production' : 'sandbox';
 const PESAPAL_IPN_ID = (process.env.PESAPAL_IPN_ID || '').trim();
 
 const PESAPAL_URL = PESAPAL_MODE === 'production' 
   ? 'https://pay.pesapal.com/v3'
   : 'https://cybqa.pesapal.com/pesapalv3';
 
+console.log(`[Server] NODE_ENV: [${process.env.NODE_ENV}]`);
 console.log('--- PesaPal Config Diagnostic ---');
-console.log(`MODE: [${PESAPAL_MODE}]`);
+console.log(`RAW_MODE_ENV: [${process.env.PESAPAL_MODE}]`);
+console.log(`EVALUATED_MODE: [${PESAPAL_MODE}]`);
 console.log(`BASE_URL: [${PESAPAL_URL}]`);
-console.log(`KEY: [${PESAPAL_CONSUMER_KEY.substring(0, 5)}...]`);
+console.log(`KEY: [${PESAPAL_CONSUMER_KEY.substring(0, 5)}...${PESAPAL_CONSUMER_KEY.slice(-3)}] (len: ${PESAPAL_CONSUMER_KEY.length})`);
+console.log(`SECRET: [${PESAPAL_CONSUMER_SECRET.substring(0, 3)}...${PESAPAL_CONSUMER_SECRET.slice(-3)}] (len: ${PESAPAL_CONSUMER_SECRET.length})`);
 console.log('--------------------------------');
 
 async function getPesaPalToken() {
@@ -46,6 +50,9 @@ async function getPesaPalToken() {
     throw new Error('PesaPal credentials missing');
   }
 
+  console.log(`[PesaPal] Requesting token from: ${PESAPAL_URL}/api/Auth/RequestToken`);
+  console.log(`[PesaPal] Using Key: ${PESAPAL_CONSUMER_KEY.substring(0, 4)}...${PESAPAL_CONSUMER_KEY.slice(-4)}`);
+  
   const response = await fetch(`${PESAPAL_URL}/api/Auth/RequestToken`, {
     method: 'POST',
     headers: {
@@ -59,11 +66,36 @@ async function getPesaPalToken() {
   });
 
   const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error?.message || 'Failed to authenticate with PesaPal');
+  console.log(`[PesaPal] Token Response Status: ${response.status}`);
+  console.log(`[PesaPal] API Response JSON: ${JSON.stringify(data)}`);
+  
+  // Aggressively check for error responses
+  if (data.error || (data.status && data.status !== "200" && data.status !== 200)) {
+    const errorCode = data.error?.code || data.code || 'unknown_error';
+    const errorMsg = data.error?.message || data.message || 'Unknown API Error';
+    
+    let detail = "";
+    if (errorCode === "invalid_consumer_key_or_secret_provided") {
+      detail = `The Consumer Key or Secret provided does not match the current environment (${PESAPAL_MODE}). ` +
+               `If these are LIVE keys, set PESAPAL_MODE=production. If they are SANDBOX keys, set PESAPAL_MODE=sandbox. ` +
+               `Current URL: ${PESAPAL_URL}`;
+    }
+    
+    console.error(`[PesaPal] Auth Failure [${errorCode}]: ${errorMsg}`);
+    console.error(`[PesaPal] Detail: ${detail}`);
+    throw new Error(`PesaPal Auth Failed: ${errorCode}. ${detail}`);
   }
 
-  return data.token;
+  if (!response.ok) {
+    throw new Error(`Connection to PesaPal failed with status ${response.status}`);
+  }
+
+  const token = data.token || data.access_token;
+  if (!token) {
+    throw new Error('PesaPal response received but no token found. Check if you are using V3 keys.');
+  }
+
+  return token;
 }
 
 async function startServer() {
@@ -86,6 +118,28 @@ async function startServer() {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // DEBUG ENDPOINT
+  app.get('/api/pesapal/test-config', async (req, res) => {
+    try {
+      const token = await getPesaPalToken();
+      res.json({ 
+        success: true, 
+        token_preview: token.substring(0, 10) + '...',
+        mode: PESAPAL_MODE,
+        url: PESAPAL_URL
+      });
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        error: error.message,
+        mode: PESAPAL_MODE,
+        url: PESAPAL_URL,
+        key_len: PESAPAL_CONSUMER_KEY.length,
+        secret_len: PESAPAL_CONSUMER_SECRET.length
+      });
+    }
+  });
+
   app.post('/api/pesapal/submit-order', async (req, res) => {
     const { plan, companyId, email } = req.body;
     const amount = plan === 'pro' ? 60.00 : 30.00;
@@ -102,28 +156,37 @@ async function startServer() {
       const token = await getPesaPalToken();
       const merchantReference = `SP-${companyId.substring(0, 8)}-${Date.now()}`;
       
+      // Use full URL if available, otherwise try to construct it or use a placeholder
+      const baseUrl = process.env.APP_URL || process.env.SHARED_APP_URL || "";
+      const callbackUrl = baseUrl ? `${baseUrl}/subscription/callback` : "https://safariplanner.style-upsystems.com/subscription/callback";
+
+      console.log(`[PesaPal] Using IPN_ID: [${PESAPAL_IPN_ID}]`);
+      console.log(`[PesaPal] Using Callback URL: [${callbackUrl}]`);
+
       const payload = {
         id: merchantReference,
         currency: "USD",
         amount: amount,
         description: `SafariPlanner ${plan} Plan Subscription`,
-        callback_url: `${process.env.APP_URL}/subscription/callback`,
+        callback_url: callbackUrl,
         notification_id: PESAPAL_IPN_ID,
         billing_address: {
           email_address: email || "billing@wildrhythm.com",
           phone_number: "",
-          country_code: "",
+          country_code: "KE",
           first_name: "Customer",
           middle_name: "",
-          last_name: companyId.substring(0, 8),
+          last_name: (companyId || "Client").substring(0, 8),
           line_1: "",
           line_2: "",
-          city: "",
+          city: "Nairobi",
           state: "",
           postal_code: "",
           zip_code: ""
         }
       };
+
+      console.log(`[PesaPal] Payload: ${JSON.stringify(payload)}`);
 
       const response = await fetch(`${PESAPAL_URL}/api/Transactions/SubmitOrderRequest`, {
         method: 'POST',
@@ -136,11 +199,25 @@ async function startServer() {
       });
 
       const data = await response.json();
+      console.log(`[PesaPal] SubmitOrder Response Status: ${response.status}`);
+      console.log(`[PesaPal] SubmitOrder Response Data: ${JSON.stringify(data)}`);
+      
       if (!response.ok) {
-        throw new Error(data.error?.message || 'PesaPal SubmitOrderRequest failed');
+        throw new Error(data.error?.message || data.message || `PesaPal SubmitOrderRequest failed (Status ${response.status})`);
       }
 
-      res.json({ redirect_url: data.redirect_url, order_tracking_id: data.order_tracking_id });
+      const redirectUrl = data.redirect_url || data.url || data.redirectUrl;
+      const orderTrackingId = data.order_tracking_id || data.orderTrackingId;
+
+      if (!redirectUrl) {
+        console.error('[PesaPal] Missing redirect_url in response:', data);
+        throw new Error(`PesaPal returned successful status but no redirect URL. Message: ${data.message || 'None'}`);
+      }
+
+      res.json({ 
+        redirect_url: redirectUrl, 
+        order_tracking_id: orderTrackingId 
+      });
     } catch (error: any) {
       console.error('PesaPal Submit Order Error:', error);
       res.status(500).json({ error: error.message });
