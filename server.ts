@@ -50,52 +50,65 @@ async function getPesaPalToken() {
     throw new Error('PesaPal credentials missing');
   }
 
-  console.log(`[PesaPal] Requesting token from: ${PESAPAL_URL}/api/Auth/RequestToken`);
+  const tokenUrl = `${PESAPAL_URL}/api/Auth/RequestToken`;
+  console.log(`[PesaPal] Requesting token from: ${tokenUrl}`);
   console.log(`[PesaPal] Using Key: ${PESAPAL_CONSUMER_KEY.substring(0, 4)}...${PESAPAL_CONSUMER_KEY.slice(-4)}`);
   
-  const response = await fetch(`${PESAPAL_URL}/api/Auth/RequestToken`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    },
-    body: JSON.stringify({
-      consumer_key: PESAPAL_CONSUMER_KEY,
-      consumer_secret: PESAPAL_CONSUMER_SECRET
-    })
-  });
+  try {
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        consumer_key: PESAPAL_CONSUMER_KEY,
+        consumer_secret: PESAPAL_CONSUMER_SECRET
+      })
+    });
 
-  const data = await response.json();
-  console.log(`[PesaPal] Token Response Status: ${response.status}`);
-  console.log(`[PesaPal] API Response JSON: ${JSON.stringify(data)}`);
-  
-  // Aggressively check for error responses
-  if (data.error || (data.status && data.status !== "200" && data.status !== 200)) {
-    const errorCode = data.error?.code || data.code || 'unknown_error';
-    const errorMsg = data.error?.message || data.message || 'Unknown API Error';
-    
-    let detail = "";
-    if (errorCode === "invalid_consumer_key_or_secret_provided") {
-      detail = `The Consumer Key or Secret provided does not match the current environment (${PESAPAL_MODE}). ` +
-               `If these are LIVE keys, set PESAPAL_MODE=production. If they are SANDBOX keys, set PESAPAL_MODE=sandbox. ` +
-               `Current URL: ${PESAPAL_URL}`;
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const errorText = await response.text();
+      console.error(`[PesaPal] Non-JSON response from ${tokenUrl}:`, errorText.substring(0, 500));
+      throw new Error(`PesaPal API returned an unexpected response (Status ${response.status}). The service might be down or the URL is incorrect.`);
     }
+
+    const data = await response.json();
+    console.log(`[PesaPal] Token Response Status: ${response.status}`);
+    console.log(`[PesaPal] API Response JSON: ${JSON.stringify(data)}`);
     
-    console.error(`[PesaPal] Auth Failure [${errorCode}]: ${errorMsg}`);
-    console.error(`[PesaPal] Detail: ${detail}`);
-    throw new Error(`PesaPal Auth Failed: ${errorCode}. ${detail}`);
-  }
+    // Aggressively check for error responses
+    if (data.error || (data.status && data.status !== "200" && data.status !== 200)) {
+      const errorCode = data.error?.code || data.code || 'unknown_error';
+      const errorMsg = data.error?.message || data.message || 'Unknown API Error';
+      
+      let detail = "";
+      if (errorCode === "invalid_consumer_key_or_secret_provided") {
+        detail = `The Consumer Key or Secret provided does not match the current environment (${PESAPAL_MODE}). ` +
+                 `If these are LIVE keys, set PESAPAL_MODE=production. If they are SANDBOX keys, set PESAPAL_MODE=sandbox. ` +
+                 `Current URL: ${PESAPAL_URL}`;
+      }
+      
+      console.error(`[PesaPal] Auth Failure [${errorCode}]: ${errorMsg}`);
+      console.error(`[PesaPal] Detail: ${detail}`);
+      throw new Error(`PesaPal Auth Failed: ${errorCode}. ${detail}`);
+    }
 
-  if (!response.ok) {
-    throw new Error(`Connection to PesaPal failed with status ${response.status}`);
-  }
+    if (!response.ok) {
+      throw new Error(`Connection to PesaPal failed with status ${response.status}`);
+    }
 
-  const token = data.token || data.access_token;
-  if (!token) {
-    throw new Error('PesaPal response received but no token found. Check if you are using V3 keys.');
-  }
+    const token = data.token || data.access_token;
+    if (!token) {
+      throw new Error('PesaPal response received but no token found. Check if you are using V3 keys.');
+    }
 
-  return token;
+    return token;
+  } catch (error: any) {
+    console.error('[PesaPal] getPesaPalToken error:', error);
+    throw error;
+  }
 }
 
 async function startServer() {
@@ -154,14 +167,18 @@ async function startServer() {
     
     try {
       const token = await getPesaPalToken();
-      const merchantReference = `SP-${companyId.substring(0, 8)}-${Date.now()}`;
+      // Use full companyId in reference to allow identification. 
+      // PesaPal V3 reference limit is usually 50 chars. SP (2) + "-" (1) + UUID (36) = 39 chars.
+      const merchantReference = `SP-${companyId}`;
       
       // Use full URL if available, otherwise try to construct it or use a placeholder
       const baseUrl = process.env.APP_URL || process.env.SHARED_APP_URL || "";
-      const callbackUrl = baseUrl ? `${baseUrl}/subscription/callback` : "https://safariplanner.style-upsystems.com/subscription/callback";
+      // Use /success as it's already a route in App.tsx
+      const callbackUrl = baseUrl ? `${baseUrl}/success` : "https://safariplanner.style-upsystems.com/success";
 
       console.log(`[PesaPal] Using IPN_ID: [${PESAPAL_IPN_ID}]`);
       console.log(`[PesaPal] Using Callback URL: [${callbackUrl}]`);
+      console.log(`[PesaPal] Using Merchant Ref: [${merchantReference}]`);
 
       const payload = {
         id: merchantReference,
@@ -197,6 +214,13 @@ async function startServer() {
         },
         body: JSON.stringify(payload)
       });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const errorText = await response.text();
+        console.error('[PesaPal] SubmitOrder Non-JSON response:', errorText.substring(0, 500));
+        throw new Error(`PesaPal API returned an unexpected response format during transaction submission (Status ${response.status})`);
+      }
 
       const data = await response.json();
       console.log(`[PesaPal] SubmitOrder Response Status: ${response.status}`);
@@ -238,6 +262,13 @@ async function startServer() {
         }
       });
 
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const errorText = await response.text();
+        console.error('[PesaPal] GetTransactionStatus Non-JSON response:', errorText.substring(0, 500));
+        throw new Error(`PesaPal API returned an unexpected response format while fetching status (Status ${response.status})`);
+      }
+
       const data = await response.json();
       if (!response.ok) {
         throw new Error(data.error?.message || 'Failed to get PesaPal transaction status');
@@ -268,6 +299,13 @@ async function startServer() {
           ipn_notification_type: "GET"
         })
       });
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const errorText = await response.text();
+        console.error('[PesaPal] RegisterIPN Non-JSON response:', errorText.substring(0, 500));
+        throw new Error(`PesaPal API returned an unexpected response format during IPN registration (Status ${response.status})`);
+      }
 
       const data = await response.json();
       res.json({ 
