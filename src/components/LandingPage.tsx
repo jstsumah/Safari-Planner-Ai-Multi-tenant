@@ -44,12 +44,16 @@ const LandingPage: React.FC<LandingPageProps> = ({
       try {
         const { data, error } = await supabase.from('companies').select('*').limit(10);
         if (error) {
-          console.error("Home Companies Fetch Error:", error.message);
+          console.error("Home Companies Fetch Error:", error.message, error.details, error.hint);
           return;
         }
         if (data) setCompanies(data);
-      } catch (err) {
-        console.error("Home Companies unexpected error:", err);
+      } catch (err: any) {
+        if (err.name === 'TypeError' || err.message?.includes('fetch')) {
+          console.error("Home Companies: Network/CORS Error. Verify Supabase URL is reachable.");
+        } else {
+          console.error("Home Companies unexpected error:", err);
+        }
       }
     };
     fetchCompanies();

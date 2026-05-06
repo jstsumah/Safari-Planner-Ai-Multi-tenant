@@ -10,9 +10,15 @@ const DatabaseStatus: React.FC = () => {
     const checkConnection = async () => {
       try {
         // Simple health check query
-        const { error } = await supabase.from('companies').select('id').limit(1).single();
-        setIsActive(!error);
-      } catch (err) {
+        const { error } = await supabase.from('companies').select('id').limit(1).maybeSingle();
+        if (error) {
+           console.warn("DB Connection check reported error:", error.message);
+           setIsActive(false);
+        } else {
+           setIsActive(true);
+        }
+      } catch (err: any) {
+        console.error("DB Connection check threw:", err.message || err);
         setIsActive(false);
       }
     };

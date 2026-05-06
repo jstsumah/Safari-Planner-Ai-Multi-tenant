@@ -23,10 +23,24 @@ export const SubscriptionPage = () => {
         body: JSON.stringify({ plan, companyId: company.id })
       });
       
-      const data = await response.json();
-
+      const text = await response.text();
+      let data;
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          data = JSON.parse(text);
+        } catch (err) {
+          console.error('Failed to parse JSON response:', text.substring(0, 500));
+          throw new Error('Server returned an invalid JSON response. Please try again or contact support.');
+        }
+      } else {
+        console.error('Expected JSON but received:', text.substring(0, 500));
+        throw new Error('Server returned an unexpected response format (not JSON). Please try again later.');
+      }
+ 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to initialize payment');
+        throw new Error(data?.error || `Server Error: ${response.status}`);
       }
 
       if (data.redirect_url) {

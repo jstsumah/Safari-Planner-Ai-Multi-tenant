@@ -52,8 +52,18 @@ export const sendSafariEmail = async (params: SendEmailParams): Promise<void> =>
     body: JSON.stringify(params),
   });
 
+  const text = await response.text();
+  let data;
+  const contentType = response.headers.get('content-type');
+
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || 'Failed to send email');
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        // ignore
+      }
+    }
+    throw new Error(data?.message || data?.error || `Failed to send email (Status ${response.status})`);
   }
 };

@@ -48,12 +48,27 @@ export async function generateSafariItinerary(data: SafariFormData): Promise<Gen
       body: JSON.stringify({ prompt })
     });
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.message || `Server error: ${response.status}`);
+    const text = await response.text();
+    let data;
+    const contentType = response.headers.get('content-type');
+
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        data = JSON.parse(text);
+      } catch (err) {
+        console.error('AI Generation: Failed to parse JSON:', text.substring(0, 500));
+        throw new Error('AI Service returned an invalid response. Please try again.');
+      }
+    } else {
+      console.error('AI Generation: Expected JSON but received:', text.substring(0, 500));
+      throw new Error('AI Service returned an unexpected response. Please try again.');
     }
 
-    return await response.json();
+    if (!response.ok) {
+      throw new Error(data?.message || `Server error: ${response.status}`);
+    }
+
+    return data;
   } catch (error: any) {
     console.error("AI Generation error:", error);
     throw new Error(error.message || "Unable to generate your safari at this moment. Please try again.");

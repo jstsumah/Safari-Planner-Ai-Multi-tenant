@@ -158,6 +158,7 @@ CREATE TABLE IF NOT EXISTS team_members (
     phone TEXT,
     bio TEXT,
     photo_url TEXT,
+    user_type TEXT DEFAULT 'agency',
     is_public BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
@@ -256,6 +257,7 @@ CREATE POLICY "Public Read Itineraries" ON itineraries FOR SELECT USING (true);
 CREATE POLICY "Company Data Isolation - Itineraries" ON itineraries FOR ALL USING (company_id = get_my_company());
 
 -- Team Members
+CREATE POLICY "Users can manage their own team member entry" ON team_members FOR UPDATE USING (LOWER(email) = LOWER(auth.jwt() ->> 'email'));
 CREATE POLICY "Public Read Team Members" ON team_members FOR SELECT USING (true);
 
 -- Reviews

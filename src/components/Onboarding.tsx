@@ -41,6 +41,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isInvited, setIsInvited] = useState(false);
+  const [invitedCompany, setInvitedCompany] = useState<{id: string, name: string} | null>(null);
   
   // Local user state to bridge the gap while AuthContext is updating
   const [localUser, setLocalUser] = useState<any>(null);
@@ -156,6 +158,39 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
     return err.message;
   };
 
+  const handleEmailCheckInSignUp = async () => {
+    if (!email) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: teamMember } = await supabase
+        .from('team_members')
+        .select('company_id, companies(name)')
+        .eq('email', email.trim().toLowerCase())
+        .maybeSingle();
+
+      if (teamMember) {
+        setIsInvited(true);
+        setInvitedCompany({ 
+          id: teamMember.company_id, 
+          name: (teamMember as any).companies?.name || 'Your Company' 
+        });
+        if (teamMember.user_type) {
+          setRegType(teamMember.user_type as any);
+        }
+        setSuccess(`We found your invitation to join ${ (teamMember as any).companies?.name || 'your company' }!`);
+      } else {
+        setIsInvited(false);
+        setInvitedCompany(null);
+      }
+      setStep(2);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -185,13 +220,22 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
               role: 'user'
             }]);
           if (profileError) throw profileError;
-          setSuccess("Account created! Please sign in with your credentials.");
-          setIsSignUp(false);
-          setStep(1);
-          setShowPasswordField(false);
-          setEmail(email); // Keep email for convenience
-          setPassword('');
-          await supabase.auth.signOut();
+          
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            setSuccess("Account created! Redirecting...");
+            await refreshProfile();
+            setTimeout(() => {
+              if (onComplete) onComplete('user');
+            }, 1000);
+          } else {
+            setSuccess("Account created! Please check your email or sign in below.");
+            setIsSignUp(false);
+            setStep(1);
+            setShowPasswordField(false);
+            setEmail(email);
+            setPassword('');
+          }
           return;
         }
         // Now that we have the user, we create the company and profile
@@ -210,20 +254,44 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
     setLoading(true);
     setError(null);
     try {
-      const { data: exists, error } = await supabase
+      const { data: exists, error: rpcError } = await supabase
         .rpc('check_email_exists', { email_to_check: email.trim().toLowerCase() });
 
-      if (error) throw error;
+      if (rpcError) throw rpcError;
 
       if (exists) {
         setShowPasswordField(true);
       } else {
-        setError("Account not found. Please sign up to create your agency.");
-        setTimeout(() => {
-          setIsSignUp(true);
-          setStep(1);
-          setError(null);
-        }, 2000);
+        // Check if they are invited but not yet registered in Auth
+        const { data: teamMember, error: tmError } = await supabase
+          .from('team_members')
+          .select('company_id, companies(name), user_type')
+          .eq('email', email.trim().toLowerCase())
+          .maybeSingle();
+
+        if (teamMember) {
+          setError("Invitation found! Redirecting you to activate your account...");
+          setTimeout(() => {
+            setIsSignUp(true);
+            setStep(2); // Set password step
+            setIsInvited(true);
+            setInvitedCompany({ 
+              id: teamMember.company_id, 
+              name: (teamMember as any).companies?.name || 'Your Company' 
+            });
+            if (teamMember.user_type) {
+              setRegType(teamMember.user_type as any);
+            }
+            setError(null);
+          }, 800);
+        } else {
+          setError("Account not found. Please sign up to create your agency.");
+          setTimeout(() => {
+            setIsSignUp(true);
+            setStep(1);
+            setError(null);
+          }, 800);
+        }
       }
     } catch (err: any) {
       setError(formatAuthError(err));
@@ -250,6 +318,31 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
         await refreshProfile();
       }
     } catch (err: any) {
+      const errMsg = err.message || '';
+      if (errMsg.toLowerCase().includes('invalid login credentials') || errMsg.toLowerCase().includes('not found')) {
+        // Double check if they have an invitation but didn't activate yet
+        const { data: teamMember } = await supabase
+          .from('team_members')
+          .select('company_id, companies(name), user_type')
+          .eq('email', email.trim().toLowerCase())
+          .maybeSingle();
+
+        if (teamMember) {
+          setError("Invitation found! Redirecting to activation...");
+          setTimeout(() => {
+            setIsSignUp(true);
+            setStep(2);
+            setIsInvited(true);
+            setInvitedCompany({ 
+              id: teamMember.company_id, 
+              name: (teamMember as any).companies?.name || 'Your Company' 
+            });
+            if (teamMember.user_type) setRegType(teamMember.user_type as any);
+            setError(null);
+          }, 1500);
+          return;
+        }
+      }
       setError(formatAuthError(err));
     } finally {
       setLoading(false);
@@ -326,60 +419,83 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
 
   const finalizeOnboarding = async (currentUser: any) => {
     try {
-      const slug = companySlug.toLowerCase().replace(/[^a-z0-9-]/g, '-').trim();
-      
-      // 1. Create Company
-      const { data: company, error: companyError } = await supabase
-        .from('companies')
-        .insert([{
-          name: companyName,
-          slug: slug,
-          branding: { 
-            ...INITIAL_BRANDING, 
-            appName: companyName, 
-            contactEmail: currentUser.email,
-            subscription_status: 'trial',
-            trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
-          }
-        }])
-        .select()
-        .single();
-
-      if (companyError) throw companyError;
+      let finalCompanyId = invitedCompany?.id;
 
       // 2. Create Profile
       const { error: profileError } = await supabase
         .from('profiles')
         .upsert([{
           id: currentUser.id,
-          company_id: company.id,
+          company_id: finalCompanyId,
           full_name: fullName || currentUser.user_metadata?.full_name || 'Admin',
           email: currentUser.email!,
           user_type: regType,
-          role: 'admin'
+          role: regType === 'user' ? 'user' : (invitedCompany ? 'staff' : 'admin')
         }]);
 
       if (profileError) throw profileError;
 
-      // 3. Automatically add creator to the Team Members list
-      await supabase
-        .from('team_members')
-        .insert([{
-          company_id: company.id,
-          name: fullName || currentUser.user_metadata?.full_name || 'Company Owner',
-          role: 'Managing Director',
-          email: currentUser.email!,
-          bio: 'Founder and Lead Safari Specialist.',
-          photo_url: currentUser.user_metadata?.avatar_url || ''
-        }]);
+      if (!invitedCompany?.id && regType !== 'user') {
+        const slug = companySlug.toLowerCase().replace(/[^a-z0-9-]/g, '-').trim();
+        
+        // 1. Create Company
+        const { data: company, error: companyError } = await supabase
+          .from('companies')
+          .insert([{
+            name: companyName,
+            slug: slug,
+            branding: { 
+              ...INITIAL_BRANDING, 
+              appName: companyName, 
+              contactEmail: currentUser.email,
+              subscription_status: 'trial',
+              trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          }])
+          .select()
+          .single();
+
+        if (companyError) throw companyError;
+        finalCompanyId = company.id;
+
+        // 3. Automatically add creator to the Team Members list
+        await supabase
+          .from('team_members')
+          .insert([{
+            company_id: finalCompanyId,
+            name: fullName || currentUser.user_metadata?.full_name || 'Company Owner',
+            role: 'Managing Director',
+            email: currentUser.email!,
+            bio: 'Founder and Lead Safari Specialist.',
+            photo_url: currentUser.user_metadata?.avatar_url || ''
+          }]);
+      } else if (invitedCompany?.id) {
+        // If invited, we might want to update the team member entry with the user's name/photo
+        await supabase
+          .from('team_members')
+          .update({
+            name: fullName || currentUser.user_metadata?.full_name,
+            photo_url: currentUser.user_metadata?.avatar_url || ''
+          })
+          .eq('email', currentUser.email!)
+          .eq('company_id', finalCompanyId);
+      }
 
       if (isSignUp) {
-        setSuccess("Agency setup complete! Please sign in with your credentials to access your dashboard.");
-        setIsSignUp(false);
-        setStep(1);
-        setShowPasswordField(false);
-        setPassword('');
-        await supabase.auth.signOut();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setSuccess("Account setup complete! Redirecting to your dashboard...");
+          await refreshProfile();
+          setTimeout(() => {
+            if (onComplete) onComplete(regType);
+          }, 1000);
+        } else {
+          setSuccess("Registration successful! Please check your email for a confirmation link or sign in below.");
+          setIsSignUp(false);
+          setStep(1);
+          setShowPasswordField(false);
+          setPassword('');
+        }
       } else {
         await refreshProfile();
         if (onComplete) onComplete(regType);
@@ -452,7 +568,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
           <h2 className="text-3xl font-extrabold text-safari-900 text-center mb-3">
             {view === 'auth' ? (
               isSignUp ? (
-                step === 1 ? 'Join the Network' : 'Create your Account'
+                step === 1 ? 'Start Your Journey' : 
+                (isInvited ? 'Accept Invitation' : 'Setup your Account')
               ) : 'Welcome Back'
             ) : view === 'company' ? (
               'Setup Agency Profile'
@@ -467,7 +584,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
               isSignUp ? (
                 step === 1 
                   ? 'Choose how you want to use the platform.'
-                  : regType !== 'user' ? 'Secure your professional management dashboard.' : 'Start your personal safari journey.'
+                  : isInvited 
+                    ? `You've been invited to join ${invitedCompany?.name}.`
+                    : regType !== 'user' ? 'Secure your professional management dashboard.' : 'Start your personal safari journey.'
               ) : 'Log in to manage your professional safari business.'
             ) : view === 'company' ? (
               'Tell us about your company to get started.'
@@ -485,7 +604,12 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 1.05 }}
-                onSubmit={handleCompanySubmit}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (regType === 'user') setStep(2);
+                  else if (email && fullName && password) handleSignUp(e);
+                  else setStep(2);
+                }}
                 className="space-y-6"
               >
                 <div>
@@ -530,59 +654,34 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                   </div>
                 </div>
 
-                {regType !== 'user' && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="space-y-6 overflow-hidden"
-                  >
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-safari-600 mb-2 px-1">
-                        {regType === 'provider' ? 'Company Name' : 'Property/Hotel Name'}
-                      </label>
-                      <input
-                        type="text"
-                        required={regType !== 'user'}
-                        value={companyName}
-                        onChange={(e) => {
-                          setCompanyName(e.target.value);
-                          updateSlugFromName(e.target.value);
-                        }}
-                        className="w-full px-5 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
-                        placeholder={regType === 'provider' ? "e.g. Serengeti Tours" : "e.g. Serengeti Luxury Lodge"}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black uppercase tracking-widest text-safari-600 mb-2 px-1">Handled Slug (URL)</label>
-                      <div className="text-safari-400 text-[10px] mb-2 font-bold px-1 truncate">
-                        safariplanner.ai/{regType === 'provider' ? 'operator' : 'accommodation'}/<span className="text-safari-900 font-black">{companySlug || '...'}</span>
-                      </div>
-                      <input
-                        type="text"
-                        readOnly
-                        value={companySlug}
-                        className="w-full px-5 py-3 bg-safari-50/50 border border-safari-100 rounded-lg outline-none cursor-not-allowed font-bold text-sm text-safari-400"
-                        placeholder="Auto-generated from name"
-                      />
-                    </div>
-                  </motion.div>
-                )}
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-safari-600 mb-2 px-1">Email Address</label>
+                  <div className="relative group">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-safari-400 group-focus-within:text-safari-600 transition-colors" size={18} />
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
+                      placeholder="email@agency.com"
+                    />
+                  </div>
+                </div>
                 
                 {error && <p className="text-red-600 text-xs font-bold bg-red-50/50 backdrop-blur-md p-4 rounded-lg border border-red-100/50">{error}</p>}
-                
+                {success && <p className="text-green-600 text-[10px] font-black uppercase tracking-widest bg-green-50/50 backdrop-blur-md p-4 rounded-lg border border-green-100/50">{success}</p>}
+
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-4 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
                   onClick={(e) => {
-                    if (regType === 'user') {
-                      e.preventDefault();
-                      setStep(2);
-                    }
+                    e.preventDefault();
+                    handleEmailCheckInSignUp();
                   }}
+                  className="w-full py-4 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
                 >
-                  {loading ? <Loader2 className="animate-spin" /> : 'Next: Account Details'}
+                  {loading ? <Loader2 className="animate-spin" /> : 'Continue'}
                   <ArrowRight size={18} />
                 </button>
 
@@ -609,9 +708,43 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 1.05 }}
-                onSubmit={handleSignUp}
+                onSubmit={isInvited || regType === 'user' ? handleSignUp : handleCompanySubmit}
                 className="space-y-4"
               >
+                {!isInvited && regType !== 'user' && (
+                  <div className="space-y-6 mb-6">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-safari-600 mb-2 px-1">
+                        {regType === 'provider' ? 'Company Name' : 'Property/Hotel Name'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={companyName}
+                        onChange={(e) => {
+                          setCompanyName(e.target.value);
+                          updateSlugFromName(e.target.value);
+                        }}
+                        className="w-full px-5 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
+                        placeholder={regType === 'provider' ? "e.g. Serengeti Tours" : "e.g. Serengeti Luxury Lodge"}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase tracking-widest text-safari-600 mb-2 px-1">Handled Slug (URL)</label>
+                      <div className="text-safari-400 text-[10px] mb-2 font-bold px-1 truncate">
+                        safariplanner.ai/{regType === 'provider' ? 'operator' : 'accommodation'}/<span className="text-safari-900 font-black">{companySlug || '...'}</span>
+                      </div>
+                      <input
+                        type="text"
+                        readOnly
+                        value={companySlug}
+                        className="w-full px-5 py-3 bg-safari-50/50 border border-safari-100 rounded-lg outline-none cursor-not-allowed font-bold text-sm text-safari-400"
+                        placeholder="Auto-generated from name"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-safari-600 mb-2 px-1">Full Name</label>
                   <div className="relative group">
@@ -623,20 +756,6 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                       onChange={(e) => setFullName(e.target.value)}
                       className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                       placeholder="e.g. Jane Doe"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-safari-600 mb-2 px-1">Email Address</label>
-                  <div className="relative group">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-safari-400 group-focus-within:text-safari-600 transition-colors" size={18} />
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
-                      placeholder="email@agency.com"
                     />
                   </div>
                 </div>
@@ -654,6 +773,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                     />
                   </div>
                 </div>
+                
                 {error && <p className="text-red-600 text-xs font-bold bg-red-50/50 backdrop-blur-md p-4 rounded-lg border border-red-100/50">{error}</p>}
                 
                 <button
@@ -661,14 +781,17 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                   disabled={loading}
                   className="w-full py-4 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
                 >
-                  {loading ? <Loader2 className="animate-spin" /> : 'Complete Registration'}
+                  {loading ? <Loader2 className="animate-spin" /> : (isInvited ? 'Accept & Join' : 'Register & Setup')}
                   <CheckCircle2 size={18} />
                 </button>
 
                 <div className="text-center pt-2">
                   <button
                     type="button"
-                    onClick={() => setStep(1)}
+                    onClick={() => {
+                      setStep(1);
+                      setSuccess(null);
+                    }}
                     className="text-safari-900 font-black text-[10px] uppercase tracking-widest hover:underline"
                   >
                     ← Back to Details

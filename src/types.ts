@@ -259,6 +259,7 @@ export interface TeamMember {
   photo_url: string;
   email: string;
   phone: string;
+  user_type?: 'agency' | 'user' | 'provider';
   is_public?: boolean;
   created_at?: string;
 }

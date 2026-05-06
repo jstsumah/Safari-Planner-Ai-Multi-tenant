@@ -384,6 +384,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
     photo_url: '',
     email: '',
     phone: '',
+    user_type: 'agency' as 'agency' | 'user' | 'provider',
     is_public: true,
     system_role: 'staff' as 'admin' | 'staff'
   });
@@ -1224,8 +1225,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       // Create team member entry which acts as an invitation
       const { error } = await supabase.from('team_members').insert([{
         name: newUserData.full_name,
-        email: newUserData.email,
+        email: newUserData.email.toLowerCase().trim(),
         company_id: newUserData.company_id || null,
+        user_type: newUserData.user_type,
         role: newUserData.user_type === 'agency' ? 'Safari Consultant' : 'Associate'
       }]);
       if (error) throw error;
@@ -3231,7 +3233,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               <button 
                 onClick={() => {
                   setSelectedMember(null);
-                  setMemberFormData({ name: '', role: '', bio: '', photo_url: '', email: '', phone: '', is_public: true, system_role: 'staff' });
+                  setMemberFormData({ name: '', role: '', bio: '', photo_url: '', email: '', phone: '', user_type: 'agency', is_public: true, system_role: 'staff' });
                   setIsTeamModalOpen(true);
                 }} 
                 className="bg-safari-800 text-white px-8 py-3 rounded-lg font-bold uppercase text-xs tracking-widest hover:bg-safari-900 transition-all shadow-xl flex items-center gap-2"
@@ -3310,6 +3312,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                             photo_url: member.photo_url || '',
                             email: member.email || '',
                             phone: member.phone || '',
+                            user_type: member.user_type || 'agency',
                             is_public: member.is_public !== false,
                             system_role: (member as any).system_role || 'staff'
                           });
@@ -3919,15 +3922,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-safari-400">Photo URL</label>
-                  <input 
-                    type="text" 
-                    value={memberFormData.photo_url}
-                    onChange={(e) => setMemberFormData({...memberFormData, photo_url: e.target.value})}
-                    placeholder="https://..."
-                    className="w-full px-4 py-2 bg-safari-50 border border-safari-100 rounded-lg focus:ring-2 focus:ring-safari-500 outline-none"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-safari-400">User Type *</label>
+                    <select 
+                      value={memberFormData.user_type}
+                      onChange={(e) => setMemberFormData({...memberFormData, user_type: e.target.value as any})}
+                      className="w-full px-4 py-2 bg-safari-50 border border-safari-100 rounded-lg focus:ring-2 focus:ring-safari-500 outline-none font-bold text-sm"
+                    >
+                      <option value="agency">Agency Staff</option>
+                      <option value="user">Individual User</option>
+                      <option value="provider">Provider / Supplier</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-safari-400">Photo URL</label>
+                    <input 
+                      type="text" 
+                      value={memberFormData.photo_url}
+                      onChange={(e) => setMemberFormData({...memberFormData, photo_url: e.target.value})}
+                      placeholder="https://..."
+                      className="w-full px-4 py-2 bg-safari-50 border border-safari-100 rounded-lg focus:ring-2 focus:ring-safari-500 outline-none"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1">

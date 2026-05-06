@@ -126,13 +126,20 @@ async function startServer() {
   app.use(express.json({ limit: '10mb' }));
 
   // --- API ROUTES ---
+  const apiRouter = express.Router();
 
-  app.get('/api/health', (req, res) => {
+  // LOG ALL API REQUESTS IN PRODUCTION FOR DIAGNOSTICS
+  apiRouter.use((req, res, next) => {
+    console.log(`[API] ${req.method} ${req.path}`);
+    next();
+  });
+
+  apiRouter.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
   // DEBUG ENDPOINT
-  app.get('/api/pesapal/test-config', async (req, res) => {
+  apiRouter.get('/pesapal/test-config', async (req, res) => {
     try {
       const token = await getPesaPalToken();
       res.json({ 
@@ -153,7 +160,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/pesapal/submit-order', async (req, res) => {
+  apiRouter.post('/pesapal/submit-order', async (req, res) => {
     const { plan, companyId, email } = req.body;
     const amount = plan === 'pro' ? 60.00 : 30.00;
     
@@ -248,7 +255,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/pesapal/transaction-status', async (req, res) => {
+  apiRouter.get('/pesapal/transaction-status', async (req, res) => {
     const { OrderTrackingId } = req.query;
     if (!OrderTrackingId) return res.status(400).json({ error: 'OrderTrackingId is required' });
 
@@ -282,7 +289,7 @@ async function startServer() {
   });
 
   // HELPER TO GET IPN ID: Visit this URL to get your IPN_ID
-  app.get('/api/pesapal/register-ipn', async (req, res) => {
+  apiRouter.get('/pesapal/register-ipn', async (req, res) => {
     try {
       const token = await getPesaPalToken();
       const ipnUrl = "https://safariplanner.style-upsystems.com/api/pesapal/ipn";
@@ -318,7 +325,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/pesapal/ipn', async (req, res) => {
+  apiRouter.get('/pesapal/ipn', async (req, res) => {
     const { OrderTrackingId, OrderNotificationType, OrderMerchantReference } = req.query;
     
     console.log('--- PesaPal IPN Received (GET) ---');
@@ -373,12 +380,7 @@ async function startServer() {
     }
   });
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-  if (!GEMINI_API_KEY) {
-    console.warn("GEMINI_API_KEY is missing from environment variables.");
-  }
-
-  app.post('/api/generate-itinerary', async (req, res) => {
+  apiRouter.post('/generate-itinerary', async (req, res) => {
     try {
       const { prompt } = req.body;
       if (!prompt) return res.status(400).json({ message: 'Prompt is required' });
@@ -404,10 +406,7 @@ async function startServer() {
     }
   });
 
-  const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
-  const MAILERSEND_FROM_EMAIL = process.env.MAILERSEND_FROM_EMAIL;
-
-  app.post('/api/send-email', async (req, res) => {
+  apiRouter.post('/send-email', async (req, res) => {
     try {
       const { to, cc, subject, html, attachment } = req.body;
 
@@ -461,33 +460,57 @@ async function startServer() {
     }
   });
 
-  // --- VITE MIDDLEWARE / STATIC ASSETS ---
-
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { 
-        middlewareMode: true,
-        hmr: false
-      },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
-
-  // Global Error Handler
-  app.use((err: any, req: any, res: any, next: any) => {
-    console.error('Server Error:', err);
-    res.status(500).json({
-      message: 'Internal Server Error',
-      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  // API Router fallback (404 for unknown /api/*)
+  apiRouter.use((req, res) => {
+    console.warn(`[API 404] ${req.method} ${req.path}`);
+    res.status(404).json({ 
+      error: 'API endpoint not found', 
+      path: req.path,
+      method: req.method
     });
   });
+
+  // Mount API Router
+  app.use('/api', apiRouter);
+
+  // --- VITE MIDDLEWARE / STATIC ASSETS ---
+ 
+   if (process.env.NODE_ENV !== 'production') {
+     const vite = await createViteServer({
+       server: { 
+         middlewareMode: true,
+         hmr: false
+       },
+       appType: 'spa',
+     });
+     app.use(vite.middlewares);
+   } else {
+     const distPath = path.join(process.cwd(), 'dist');
+     app.use(express.static(distPath));
+     
+     // IMPORTANT: Catch-all should only apply to non-API routes
+     app.get('*', (req, res) => {
+       res.sendFile(path.join(distPath, 'index.html'));
+     });
+   }
+
+   // Global Error Handler - ensure it ALWAYS returns JSON for /api requests
+   app.use((err: any, req: any, res: any, next: any) => {
+     const isApiRequest = req.path.startsWith('/api/') || req.originalUrl.startsWith('/api/');
+     console.error(`[Global Error] ${req.method} ${req.originalUrl}:`, err);
+     
+     if (isApiRequest) {
+       return res.status(err.status || 500).json({
+         error: err.message || 'Internal Server Error',
+         path: req.originalUrl,
+         method: req.method,
+         stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+       });
+     }
+     
+     // For non-API routes, let it fall through or send a generic HTML error
+     res.status(500).send('An internal server error occurred.');
+   });
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
