@@ -60,7 +60,7 @@ export const sendSafariEmail = async (params: SendEmailParams): Promise<void> =>
     if (contentType && contentType.includes('application/json')) {
       try {
         data = JSON.parse(text);
-      } catch (e) {
+      } catch {
         // ignore
       }
     }

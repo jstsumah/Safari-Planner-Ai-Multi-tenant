@@ -1,4 +1,5 @@
 import { SafariFormData, GeneratedItinerary } from "../types";
+import { GoogleGenAI } from "@google/genai";
 
 export async function generateSafariItinerary(data: SafariFormData): Promise<GeneratedItinerary> {
   const prompt = `
@@ -42,35 +43,32 @@ export async function generateSafariItinerary(data: SafariFormData): Promise<Gen
   `;
 
   try {
-    const response = await fetch('/api/generate-itinerary', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt })
+    const ai = new GoogleGenAI({ apiKey: (process.env.GEMINI_API_KEY || '') });
+    
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+      },
     });
 
-    const text = await response.text();
-    let data;
-    const contentType = response.headers.get('content-type');
-
-    if (contentType && contentType.includes('application/json')) {
-      try {
-        data = JSON.parse(text);
-      } catch (err) {
-        console.error('AI Generation: Failed to parse JSON:', text.substring(0, 500));
-        throw new Error('AI Service returned an invalid response. Please try again.');
-      }
-    } else {
-      console.error('AI Generation: Expected JSON but received:', text.substring(0, 500));
-      throw new Error('AI Service returned an unexpected response. Please try again.');
+    const responseText = response.text;
+    if (!responseText) {
+      throw new Error("Empty AI response");
     }
 
-    if (!response.ok) {
-      throw new Error(data?.message || `Server error: ${response.status}`);
+    try {
+      return JSON.parse(responseText.trim());
+    } catch {
+      console.error('AI Generation: Failed to parse JSON:', responseText.substring(0, 500));
+      throw new Error('AI Service returned an invalid response format. Please try again.');
     }
-
-    return data;
   } catch (error: any) {
     console.error("AI Generation error:", error);
+    if (error.message?.includes('API_KEY_INVALID')) {
+      throw new Error("AI service configuration error. Please check your API key.");
+    }
     throw new Error(error.message || "Unable to generate your safari at this moment. Please try again.");
   }
 }

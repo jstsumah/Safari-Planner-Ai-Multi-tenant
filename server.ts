@@ -124,6 +124,9 @@ async function startServer() {
   app.use(compression());
   app.use(cors());
   app.use(express.json({ limit: '10mb' }));
+  
+  const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
+  const MAILERSEND_FROM_EMAIL = process.env.MAILERSEND_FROM_EMAIL;
 
   // --- API ROUTES ---
   const apiRouter = express.Router();
@@ -380,32 +383,6 @@ async function startServer() {
     }
   });
 
-  apiRouter.post('/generate-itinerary', async (req, res) => {
-    try {
-      const { prompt } = req.body;
-      if (!prompt) return res.status(400).json({ message: 'Prompt is required' });
-      if (!GEMINI_API_KEY) return res.status(503).json({ message: 'AI service not configured' });
-
-      const { GoogleGenAI } = await import("@google/genai");
-      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-        },
-      });
-      
-      const responseText = response.text;
-      if (!responseText) throw new Error("Empty AI response");
-      
-      return res.json(JSON.parse(responseText));
-    } catch (error: any) {
-      console.error("AI Generation Error:", error);
-      return res.status(500).json({ message: 'AI generation failed', error: error.message });
-    }
-  });
-
   apiRouter.post('/send-email', async (req, res) => {
     try {
       const { to, cc, subject, html, attachment } = req.body;
@@ -462,10 +439,11 @@ async function startServer() {
 
   // API Router fallback (404 for unknown /api/*)
   apiRouter.use((req, res) => {
-    console.warn(`[API 404] ${req.method} ${req.path}`);
+    console.warn(`[API 404] ${req.method} ${req.originalUrl} (Path inside router: ${req.path})`);
     res.status(404).json({ 
       error: 'API endpoint not found', 
-      path: req.path,
+      path: req.originalUrl,
+      routerPath: req.path,
       method: req.method
     });
   });
