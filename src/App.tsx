@@ -199,7 +199,17 @@ const App: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     const hash = window.location.hash;
     
-    if (hash.includes('type=recovery') || params.get('type') === 'recovery') return 'reset-password';
+    // Debug logging for password reset detection
+    if (hash.includes('type=recovery') || hash.includes('access_token=')) {
+      console.log('App: Detected recovery hash');
+      return 'reset-password';
+    }
+    
+    if (params.get('type') === 'recovery') {
+      console.log('App: Detected recovery query param');
+      return 'reset-password';
+    }
+
     if (params.get('auth') || params.get('invite')) return 'auth';
     if (params.get('master') || params.get('itin')) return 'itinerary';
     if (params.get('tool') === 'calculator') return 'calculator';
@@ -503,7 +513,9 @@ const App: React.FC = () => {
     }, 0);
     const setupAuthEvents = async () => {
       const { data } = supabase.auth.onAuthStateChange(async (event) => {
+        console.log('App: Supabase Auth Event:', event);
         if (event === 'PASSWORD_RECOVERY') {
+          console.log('App: Password recovery event triggered');
           setViewMode('reset-password');
         }
       });
@@ -607,7 +619,7 @@ const App: React.FC = () => {
   };
 
   // Allow shared views, the planner form and results to be public
-  const isPublicView = isSharedView || viewMode === 'calculator' || viewMode === 'landing' || viewMode === 'auth' || viewMode === 'form' || viewMode === 'itinerary' || viewMode === 'partners';
+  const isPublicView = isSharedView || viewMode === 'calculator' || viewMode === 'landing' || viewMode === 'auth' || viewMode === 'form' || viewMode === 'itinerary' || viewMode === 'partners' || viewMode === 'reset-password';
 
   // Improved loading logic to prevent data loss on tab switch/refresh
   const showFullLoader = authLoading && !isPublicView && !user && !profile;

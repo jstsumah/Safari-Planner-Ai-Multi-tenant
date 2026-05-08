@@ -218,7 +218,7 @@ const DEFAULT_BRANDING: BrandingConfig = {
 type AdminTab = 'dashboard' | 'properties' | 'property_edit' | 'property_view' | 'leads' | 'costing' | 'quotations' | 'invoices' | 'invoice_editor' | 'payments' | 'receipts' | 'signature_safaris' | 'safari_edit' | 'calculator' | 'planner' | 'disbursements' | 'payment_vouchers' | 'settings' | 'itinerary_view' | 'team' | 'super_hub';
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
-  const { user, profile, company, refreshProfile, signOut } = useAuth();
+  const { user, profile, company, refreshProfile, signOut, resetPassword } = useAuth();
   
   // Navigation State
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
@@ -234,7 +234,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   // Configuration State
   const [branding, setBranding] = useState<BrandingConfig>(DEFAULT_BRANDING);
   const [globalBranding, setGlobalBranding] = useState<BrandingConfig>(DEFAULT_BRANDING);
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'system' | 'visuals' | 'landing' | 'business' | 'data'>('visuals');
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'system' | 'visuals' | 'landing' | 'business' | 'data' | 'security'>('visuals');
 
   // Data State
   const [leads, setLeads] = useState<any[]>([]);
@@ -247,7 +247,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [isMasterLoading, setIsMasterLoading] = useState(false);
   const [isTeamLoading, setIsTeamLoading] = useState(false);
   const [isSavingBranding, setIsSavingBranding] = useState(false);
-  
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [profileFullName, setProfileFullName] = useState(profile?.full_name || '');
+  const [profilePhoneNumber, setProfilePhoneNumber] = useState(profile?.phone_number || '');
+
+  useEffect(() => {
+    if (profile) {
+      setProfileFullName(profile.full_name || '');
+      setProfilePhoneNumber(profile.phone_number || '');
+    }
+  }, [profile]);
+
   const [lodges, setLodges] = useState<Lodge[]>([]);
   const [customRates, setCustomRates] = useState<LodgeCustomRate[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
@@ -717,6 +727,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
       toast.error("Failed to save: " + err.message);
     } finally {
       setIsSavingBranding(false);
+    }
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!user) return;
+    setIsUpdatingProfile(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: profileFullName,
+          phone_number: profilePhoneNumber,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      
+      await refreshProfile();
+      toast.success("Profile updated successfully!");
+    } catch (err: any) {
+      toast.error("Failed to update profile: " + err.message);
+    } finally {
+      setIsUpdatingProfile(false);
     }
   };
 
@@ -2103,6 +2137,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                 profile?.is_super_user && { id: 'data', label: 'Global System Log', icon: <Database size={14} /> },
                 { id: 'visuals', label: 'Agency Branding', icon: <Palette size={14} /> },
                 { id: 'business', label: 'Agency & Finance', icon: <Building size={14} /> },
+                { id: 'security', label: 'Security & Profile', icon: <Lock size={14} /> },
                 { id: 'payments', label: 'Payment Integrations', icon: <CreditCard size={14} /> },
               ].filter(Boolean).map((tab: any) => (
                 <button
@@ -3188,7 +3223,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
               <div className="space-y-6 animate-fadeIn">
                 <section className="bg-white rounded-xl shadow-sm border border-safari-100 p-8">
                   <h3 className="text-lg font-bold text-safari-900 mb-8 flex items-center gap-2 italic">
-                    <Database className="text-safari-500" size={20} />
+                    <Database className="text-safari-50" size={20} />
                     Global System Log
                   </h3>
                   <p className="text-sm text-safari-500 font-medium mb-8">Platform-wide diagnostics and activity monitoring for super users.</p>
@@ -3196,6 +3231,96 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                     <Database className="text-safari-300 mb-4" size={48} />
                     <h4 className="font-bold text-safari-900">Advanced Data Hub</h4>
                     <p className="text-xs text-safari-500 max-w-xs mt-2">Global pricing controls have been moved to individual agency settings. This tab now serves as a system log entry point.</p>
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {activeSettingsTab === 'security' && (
+              <div className="space-y-6 animate-fadeIn">
+                <section className="bg-white rounded-xl shadow-sm border border-safari-100 p-8">
+                  <div className="flex items-center gap-2 mb-8">
+                    <Lock className="text-safari-500" size={20} />
+                    <h3 className="text-lg font-bold text-safari-900 italic">Security & Profile Settings</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                    <div className="space-y-6">
+                      <h4 className="text-xs font-black uppercase text-safari-400 tracking-widest border-b border-safari-50 pb-2">Profile Identity</h4>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Full Name</label>
+                          <input 
+                            type="text" 
+                            className="w-full p-3 bg-white border border-safari-100 rounded-lg font-bold text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20" 
+                            value={profileFullName} 
+                            onChange={(e) => setProfileFullName(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Phone Number</label>
+                          <input 
+                            type="text" 
+                            className="w-full p-3 bg-white border border-safari-100 rounded-lg font-bold text-safari-900 outline-none focus:ring-2 focus:ring-safari-500/20" 
+                            value={profilePhoneNumber} 
+                            onChange={(e) => setProfilePhoneNumber(e.target.value)}
+                            placeholder="+254..."
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest ml-1">Email Address</label>
+                          <input 
+                            type="email" 
+                            className="w-full p-3 bg-safari-50 border border-safari-100 rounded-lg font-bold text-safari-500 outline-none" 
+                            value={user?.email || ''} 
+                            disabled 
+                          />
+                          <p className="text-[10px] text-safari-400 italic font-medium">Authentication email cannot be changed from this panel.</p>
+                        </div>
+                        <div className="pt-4">
+                          <button 
+                            onClick={handleUpdateProfile}
+                            disabled={isUpdatingProfile}
+                            className="w-full py-4 bg-safari-900 text-white rounded-lg font-black uppercase text-[10px] tracking-[0.2em] hover:bg-black transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                          >
+                            {isUpdatingProfile ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                            {isUpdatingProfile ? 'Saving...' : 'Update Profile Identity'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      <h4 className="text-xs font-black uppercase text-safari-400 tracking-widest border-b border-safari-50 pb-2">Authentication</h4>
+                      <div className="bg-safari-50 border border-safari-100 rounded-xl p-6 space-y-4">
+                        <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-safari-900 shadow-sm flex-shrink-0">
+                            <Lock size={20} />
+                          </div>
+                          <div>
+                            <h5 className="font-bold text-safari-900">Change Password</h5>
+                            <p className="text-xs text-safari-500 leading-relaxed mt-1">
+                              Need to update your password? For security, we process password changes through a verified email link.
+                            </p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={async () => {
+                            if (user?.email) {
+                              try {
+                                await resetPassword(user.email);
+                                toast.success("Password reset link sent to your email!");
+                              } catch (e: any) {
+                                toast.error(e.message || "Failed to send reset link.");
+                              }
+                            }
+                          }}
+                          className="w-full py-3 bg-safari-900 text-white rounded-lg font-black uppercase text-[10px] tracking-widest hover:bg-black transition-all shadow-md flex items-center justify-center gap-2"
+                        >
+                          <Mail size={14} /> Send Reset Link
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </section>
               </div>

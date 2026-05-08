@@ -46,7 +46,7 @@ export async function generateSafariItinerary(data: SafariFormData): Promise<Gen
     const ai = new GoogleGenAI({ apiKey: (process.env.GEMINI_API_KEY || '') });
     
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",

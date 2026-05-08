@@ -164,6 +164,9 @@ async function startServer() {
   });
 
   apiRouter.post('/pesapal/submit-order', async (req, res) => {
+    // Ensure we start with a JSON content type
+    res.setHeader('Content-Type', 'application/json');
+
     const { plan, companyId, email } = req.body;
     const amount = plan === 'pro' ? 60.00 : 30.00;
     
