@@ -10,6 +10,7 @@ import CostingModule from './components/CostingModule';
 import Onboarding from './components/Onboarding';
 import CompanyProfile from './components/CompanyProfile';
 import PartnersPage from './components/PartnersPage';
+import ResetPassword from './components/ResetPassword';
 import { SubscriptionPage } from './components/SubscriptionPage';
 import { PayPalSuccess } from './components/PayPalSuccess';
 import { PayPalCancel } from './components/PayPalCancel';
@@ -191,11 +192,14 @@ const App: React.FC = () => {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const [viewMode, setViewMode] = useState<'landing' | 'form' | 'itinerary' | 'history' | 'admin' | 'calculator' | 'auth' | 'partners' | 'subscription' | 'success' | 'cancel'>(() => {
+  const [viewMode, setViewMode] = useState<'landing' | 'form' | 'itinerary' | 'history' | 'admin' | 'calculator' | 'auth' | 'partners' | 'subscription' | 'success' | 'cancel' | 'reset-password'>(() => {
     if (window.location.pathname === '/success') return 'success';
     if (window.location.pathname === '/cancel') return 'cancel';
 
     const params = new URLSearchParams(window.location.search);
+    const hash = window.location.hash;
+    
+    if (hash.includes('type=recovery') || params.get('type') === 'recovery') return 'reset-password';
     if (params.get('auth') || params.get('invite')) return 'auth';
     if (params.get('master') || params.get('itin')) return 'itinerary';
     if (params.get('tool') === 'calculator') return 'calculator';
@@ -497,7 +501,21 @@ const App: React.FC = () => {
         setIsProfileOpen(true);
       }
     }, 0);
-    return () => clearTimeout(timeoutId);
+    const setupAuthEvents = async () => {
+      const { data } = supabase.auth.onAuthStateChange(async (event) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setViewMode('reset-password');
+        }
+      });
+      return data.subscription;
+    };
+
+    const authSubPromise = setupAuthEvents();
+    
+    return () => {
+      authSubPromise.then(sub => sub.unsubscribe());
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   // 6. Global lodge and master itinerary prefetching
@@ -697,6 +715,10 @@ const App: React.FC = () => {
     
     if (viewMode === 'cancel') {
       return <PayPalCancel />;
+    }
+
+    if (viewMode === 'reset-password') {
+      return <ResetPassword onComplete={() => setViewMode('auth')} />;
     }
 
     if (viewMode === 'calculator') {
