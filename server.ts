@@ -331,23 +331,21 @@ async function startServer() {
     }
   });
 
-  apiRouter.get('/pesapal/ipn', async (req, res) => {
-    const { OrderTrackingId, OrderNotificationType, OrderMerchantReference } = req.query;
+  // IPN Listener (Supports both GET and POST for flexibility)
+  const handleIpn = async (req: any, res: any) => {
+    const { OrderTrackingId, OrderNotificationType, OrderMerchantReference } = req.method === 'POST' ? req.body : req.query;
     
-    console.log('--- PesaPal IPN Received (GET) ---');
+    console.log(`--- PesaPal IPN Received (${req.method}) ---`);
     console.log(`Tracking ID: ${OrderTrackingId}`);
     console.log(`Type: ${OrderNotificationType}`);
     console.log(`Reference: ${OrderMerchantReference}`);
 
     if (!OrderTrackingId) {
-      return res.status(400).send('Missing Tracking ID');
+      return res.status(200).send('OK'); // Acknowledge even if empty to stop Pesapal retries if they sent a ping
     }
 
     try {
-      // 1. Get Token
       const token = await getPesaPalToken();
-      
-      // 2. Query PesaPal for the actual status
       const response = await fetch(`${PESAPAL_URL}/api/Transactions/GetTransactionStatus?orderTrackingId=${OrderTrackingId}`, {
         method: 'GET',
         headers: {
@@ -358,33 +356,24 @@ async function startServer() {
 
       const statusData = await response.json();
       
-      if (response.ok && statusData.payment_status_description === 'Success') {
+      if (response.ok && (statusData.payment_status_description === 'Success' || statusData.status_code === 1)) {
         console.log(`Transaction ${OrderTrackingId} verified as SUCCESS.`);
-        
-        // Extract company ID from merchant reference (e.g., SP-uuid-timestamp)
-        const refParts = (OrderMerchantReference as string || '').split('-');
-        if (refParts.length >= 2) {
-          // Note: In a real implementation we would update the DB here
-          // We don't have the full company UUID in the ref necessarily, 
-          // so we'd typically query by reference.
-          console.log(`Ready to update subscription for reference: ${OrderMerchantReference}`);
-        }
       }
 
-      // 3. Acknowledge the IPN to PesaPal
-      // PesaPal expects a specific JSON response to acknowledge receipt
       res.json({
         "orderNotificationType": OrderNotificationType,
         "orderTrackingId": OrderTrackingId,
         "orderMerchantReference": OrderMerchantReference,
         "status": 200
       });
-
     } catch (error) {
       console.error('Error processing PesaPal IPN:', error);
       res.status(500).send('Internal Server Error');
     }
-  });
+  };
+
+  apiRouter.get('/pesapal/ipn', handleIpn);
+  apiRouter.post('/pesapal/ipn', handleIpn);
 
   apiRouter.post('/send-email', async (req, res) => {
     try {

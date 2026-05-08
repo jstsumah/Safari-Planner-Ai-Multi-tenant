@@ -11,6 +11,7 @@ import Onboarding from './components/Onboarding';
 import CompanyProfile from './components/CompanyProfile';
 import PartnersPage from './components/PartnersPage';
 import ResetPassword from './components/ResetPassword';
+import NotFound from './components/NotFound';
 import { SubscriptionPage } from './components/SubscriptionPage';
 import { PayPalSuccess } from './components/PayPalSuccess';
 import { PayPalCancel } from './components/PayPalCancel';
@@ -192,9 +193,14 @@ const App: React.FC = () => {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const [viewMode, setViewMode] = useState<'landing' | 'form' | 'itinerary' | 'history' | 'admin' | 'calculator' | 'auth' | 'partners' | 'subscription' | 'success' | 'cancel' | 'reset-password'>(() => {
+  const [viewMode, setViewMode] = useState<'landing' | 'form' | 'itinerary' | 'history' | 'admin' | 'calculator' | 'auth' | 'partners' | 'subscription' | 'success' | 'cancel' | 'reset-password' | 'not-found'>(() => {
     if (window.location.pathname === '/success') return 'success';
     if (window.location.pathname === '/cancel') return 'cancel';
+
+    // Handle 404 for unrecognized paths (if not at root)
+    if (window.location.pathname !== '/') {
+      return 'not-found';
+    }
 
     const params = new URLSearchParams(window.location.search);
     const hash = window.location.hash;
@@ -619,7 +625,7 @@ const App: React.FC = () => {
   };
 
   // Allow shared views, the planner form and results to be public
-  const isPublicView = isSharedView || viewMode === 'calculator' || viewMode === 'landing' || viewMode === 'auth' || viewMode === 'form' || viewMode === 'itinerary' || viewMode === 'partners' || viewMode === 'reset-password';
+  const isPublicView = isSharedView || viewMode === 'calculator' || viewMode === 'landing' || viewMode === 'auth' || viewMode === 'form' || viewMode === 'itinerary' || viewMode === 'partners' || viewMode === 'reset-password' || viewMode === 'not-found';
 
   // Improved loading logic to prevent data loss on tab switch/refresh
   const showFullLoader = authLoading && !isPublicView && !user && !profile;
@@ -731,6 +737,10 @@ const App: React.FC = () => {
 
     if (viewMode === 'reset-password') {
       return <ResetPassword onComplete={() => setViewMode('auth')} />;
+    }
+
+    if (viewMode === 'not-found') {
+      return <NotFound onHome={navigateHome} />;
     }
 
     if (viewMode === 'calculator') {
