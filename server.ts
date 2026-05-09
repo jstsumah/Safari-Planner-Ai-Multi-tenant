@@ -133,6 +133,14 @@ async function startServer() {
     skip: (req, res) => req.path.startsWith('/src/')
   }));
 
+  // Global logger
+  app.use((req, res, next) => {
+    if (!req.path.startsWith('/src/')) {
+      console.log(`[Global/Request] Incoming request: ${req.method} ${req.originalUrl}`);
+    }
+    next();
+  });
+
   const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
   const MAILERSEND_FROM_EMAIL = process.env.MAILERSEND_FROM_EMAIL;
 
@@ -282,6 +290,7 @@ async function startServer() {
   });
 
   apiRouter.post('/checkout/init', async (req, res) => {
+    console.log('[DEBUG] Entering POST /checkout/init');
     // Ensure we start with a JSON content type
     res.setHeader('Content-Type', 'application/json');
 
@@ -572,12 +581,13 @@ async function startServer() {
 
   // API Router fallback (404 for unknown /api/*)
   apiRouter.use((req, res) => {
-    console.warn(`[API 404] ${req.method} ${req.originalUrl} (Path inside router: ${req.path})`);
+    console.warn(`[API 404] ${req.method} ${req.originalUrl} | Router Path: ${req.path}`);
     res.status(404).json({ 
       error: 'API endpoint not found', 
       path: req.originalUrl,
       routerPath: req.path,
-      method: req.method
+      method: req.method,
+      message: 'The requested API endpoint was not found on this server.'
     });
   });
 
