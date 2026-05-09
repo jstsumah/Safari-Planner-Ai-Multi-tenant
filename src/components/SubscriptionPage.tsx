@@ -1,12 +1,14 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Check, Zap, Globe, Shield, Star, BarChart3, CloudUpload, Infinity as InfinityIcon, ArrowLeft, Home } from 'lucide-react';
+import { Check, Zap, Globe, Shield, Star, BarChart3, CloudUpload, Infinity as InfinityIcon, ArrowLeft, Home, Loader2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'sonner';
+import { supabase } from '../lib/supabase';
 
 export const SubscriptionPage = () => {
   const { company } = useAuth();
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
   
   const subscribe = async (plan: 'starter' | 'pro') => {
     if (!company) {
@@ -14,10 +16,20 @@ export const SubscriptionPage = () => {
       return;
     }
 
-    const toastId = toast.loading('Initiating secure checkout...');
+    setIsProcessing(plan);
+    const toastId = toast.loading(`Initiating secure checkout for ${plan} plan...`);
 
+    // First try PesaPal, then Paystack as fallback, or based on branding
+    // This allows the app to be flexible depending on which keys are provided in the environment
     try {
-      const response = await fetch('/api/checkout/init', {
+      // 1. Try to get branding to see preferred gateway
+      const preferredGateway = (company as any)?.branding?.paymentGateways?.preferred || 'paystack';
+      
+      let endpoint = preferredGateway === 'pesapal' ? '/api/pesapal/submit-order' : '/api/checkout/init';
+      
+      console.log(`[Subscription] Initiating with ${preferredGateway} at ${endpoint}`);
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan, companyId: company.id, email: company.email || '' })
@@ -35,14 +47,38 @@ export const SubscriptionPage = () => {
           throw new Error('Server returned an invalid JSON response.');
         }
       } else {
-        throw new Error('Server returned an unexpected response format.');
+        console.error('Unexpected response content type:', contentType);
+        console.error('Response preview:', text.substring(0, 500));
+        
+        // If preferred failed, try fallback
+        if (preferredGateway === 'pesapal') {
+           console.log('[Subscription] PesaPal failed or missing, trying Paystack fallback...');
+           endpoint = '/api/checkout/init';
+           const retryRes = await fetch(endpoint, {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ plan, companyId: company.id, email: company.email || '' })
+           });
+           const retryText = await retryRes.text();
+           const retryType = retryRes.headers.get('content-type');
+           if (retryType?.includes('application/json')) {
+             data = JSON.parse(retryText);
+             if (!retryRes.ok) throw new Error(data?.error || `Paystack Error: ${retryRes.status}`);
+           } else {
+             throw new Error('All payment gateways failed to respond correctly.');
+           }
+        } else {
+          throw new Error('Server returned an unexpected response format during checkout initialization.');
+        }
       }
  
-      if (!response.ok) {
+      if (!response.ok && !data) { // If fallback succeeded, data will be set
         throw new Error(data?.error || `Server Error: ${response.status}`);
       }
 
-      if (data.authorization_url) {
+      const authUrl = data.authorization_url || data.redirect_url || data.url;
+      
+      if (authUrl) {
         toast.success('Opening secure payment window...', { id: toastId });
         
         // Open in a popup if possible, otherwise fallback to current window
@@ -52,14 +88,14 @@ export const SubscriptionPage = () => {
         const top = (window.screen.height / 2) - (height / 2);
         
         const popup = window.open(
-          data.authorization_url, 
+          authUrl, 
           'SafariPlannerPayment', 
           `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,status=yes`
         );
 
         if (!popup || popup.closed || typeof popup.closed === 'undefined') {
           // Popup blocked - fallback to same window
-          window.location.href = data.authorization_url;
+          window.location.href = authUrl;
         } else {
           // Listen for message from the popup
           const messageHandler = (event: MessageEvent) => {
@@ -88,7 +124,7 @@ export const SubscriptionPage = () => {
                 .eq('id', company.id)
                 .single();
                 
-              if (!pollError && refreshedCompany?.branding?.subscription_status === 'active') {
+              if (!pollError && (refreshedCompany?.branding?.subscription_status === 'active' || refreshedCompany?.branding?.subscription_status === plan)) {
                 toast.success('Subscription detected and activated!', { id: toastId });
                 setTimeout(() => {
                   window.location.href = '/?view=admin';
@@ -100,11 +136,13 @@ export const SubscriptionPage = () => {
           }, 2000);
         }
       } else {
-        throw new Error('No checkout URL returned from Paystack');
+        throw new Error('No checkout URL returned from payment gateway');
       }
     } catch (error: any) {
       console.error('Subscription error:', error);
       toast.error(error.message || 'An unexpected error occurred', { id: toastId });
+    } finally {
+      setIsProcessing(null);
     }
   };
 
@@ -247,13 +285,19 @@ export const SubscriptionPage = () => {
 
               <button
                 onClick={() => subscribe(plan.id as 'starter' | 'pro')}
-                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all active:scale-[0.98] ${
+                disabled={isProcessing !== null}
+                className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
                   plan.popular 
                     ? 'bg-white text-safari-900 hover:bg-safari-50 hover:shadow-xl hover:shadow-white/10' 
                     : 'bg-safari-900 text-white hover:bg-safari-800 hover:shadow-xl hover:shadow-safari-900/20'
-                }`}
+                } ${isProcessing !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                {plan.cta}
+                {isProcessing === plan.id ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    Processing...
+                  </>
+                ) : plan.cta}
               </button>
             </motion.div>
           ))}

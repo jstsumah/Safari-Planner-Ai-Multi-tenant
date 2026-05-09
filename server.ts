@@ -268,41 +268,42 @@ async function startServer() {
 
   // --- Paystack Implementation ---
   apiRouter.post('/checkout/init', async (req, res) => {
+    // Ensure we start with a JSON content type
+    res.setHeader('Content-Type', 'application/json');
+
     const { plan, companyId, email } = req.body;
-    
+    console.log(`[Paystack] Received init request: plan=${plan}, companyId=${companyId}`);
+
     // Default prices in USD
     let baseAmount = plan === 'pro' ? 60.00 : 30.00;
     
     // If currency is KES, convert roughly (1 USD = 135 KES - example rate)
-    // In a real app, you'd use an exchange rate API or have fixed local prices.
     if (PAYSTACK_CURRENCY === 'KES') {
       baseAmount = plan === 'pro' ? 7800.00 : 3900.00;
     } else if (PAYSTACK_CURRENCY === 'NGN') {
-      baseAmount = plan === 'pro' ? 90000.00 : 45000.00; // Example NGN rates
+      baseAmount = plan === 'pro' ? 90000.00 : 45000.00;
     }
     
-    const amount = Math.round(baseAmount * 100); // Paystack expects amount in cents/subunit
+    const amount = Math.round(baseAmount * 100);
 
     if (!PAYSTACK_SECRET_KEY) {
-      return res.status(500).json({ error: 'Paystack is not configured on the server.' });
+      console.error('[Paystack] PAYSTACK_SECRET_KEY is missing in environment');
+      return res.status(500).json({ error: 'Paystack is not configured on the server. Please add PAYSTACK_SECRET_KEY to your environment variables.' });
     }
 
     try {
       const merchantReference = `SP-${companyId}-${Date.now()}`;
       
-      // Try to determine the base URL dynamically from the request if environment variables are missing
       const protocol = req.headers['x-forwarded-proto'] || req.protocol;
       const host = req.get('host');
       const dynamicBaseUrl = `${protocol}://${host}`;
       
       const baseUrl = process.env.APP_URL || process.env.SHARED_APP_URL || dynamicBaseUrl;
-      const callbackUrl = `${baseUrl}/payment-complete`;
+      const callbackUrl = `${baseUrl.replace(/\/$/, '')}/payment-complete`;
 
-      console.log(`[Paystack] Initializing transaction: ${amount} ${PAYSTACK_CURRENCY}`);
-      console.log(`[Paystack] Using Callback URL: [${callbackUrl}]`);
-      console.log(`[Paystack] Using Merchant Ref: [${merchantReference}]`);
+      console.log(`[Paystack] Initializing: ${amount} ${PAYSTACK_CURRENCY} | Callback: ${callbackUrl}`);
 
-      const response = await fetch('https://api.paystack.co/transaction/initialize', {
+      const pResponse = await fetch('https://api.paystack.co/transaction/initialize', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
@@ -318,31 +319,34 @@ async function startServer() {
             plan,
             companyId,
             custom_fields: [
-              {
-                display_name: "Plan",
-                variable_name: "plan",
-                value: plan
-              },
-              {
-                display_name: "Company ID",
-                variable_name: "company_id",
-                value: companyId
-              }
+              { display_name: "Plan", variable_name: "plan", value: plan },
+              { display_name: "Company ID", variable_name: "company_id", value: companyId }
             ]
           }
         })
       });
 
-      const data = await response.json();
-      if (!response.ok) {
-        console.error('[Paystack] API Error Response:', data);
-        throw new Error(data.message || 'Paystack initialization failed');
+      const pContentType = pResponse.headers.get('content-type');
+      let pData;
+
+      if (pContentType && pContentType.includes('application/json')) {
+        pData = await pResponse.json();
+      } else {
+        const pText = await pResponse.text();
+        console.error('[Paystack] Non-JSON response from Paystack:', pText.substring(0, 500));
+        throw new Error(`Paystack API unexpected response format (Status ${pResponse.status})`);
       }
 
-      res.json(data.data); // data.data contains authorization_url and reference
+      if (!pResponse.ok) {
+        console.error('[Paystack] API Error:', pData);
+        throw new Error(pData.message || 'Paystack initialization failed');
+      }
+
+      console.log('[Paystack] Initialization successful');
+      return res.json(pData.data);
     } catch (error: any) {
-      console.error('Paystack Initialization Error:', error);
-      res.status(500).json({ error: error.message });
+      console.error('[Paystack] Final Error:', error);
+      return res.status(500).json({ error: error.message });
     }
   });
 
