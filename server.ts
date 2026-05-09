@@ -596,9 +596,9 @@ async function startServer() {
      app.use(express.static(distPath));
      
     // IMPORTANT: Catch-all should only apply to non-API and non-asset routes
-    app.get('*', (req, res, next) => {
+    app.all('*', (req, res, next) => {
       const isApiRequest = req.path.startsWith('/api/');
-      const looksLikeAsset = req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|map)$/);
+      const looksLikeAsset = req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|map|tsx|ts)$/);
       
       if (isApiRequest || looksLikeAsset) {
         return next();
