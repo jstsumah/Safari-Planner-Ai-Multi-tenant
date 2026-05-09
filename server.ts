@@ -139,6 +139,11 @@ async function startServer() {
   // --- API ROUTES ---
   const apiRouter = express.Router();
 
+  apiRouter.use((req, res, next) => {
+    console.log(`[API Router] Incoming request: ${req.method} ${req.originalUrl}`);
+    next();
+  });
+
   // DEBUG ENDPOINT MOUNTED FIRST
   apiRouter.get('/ping', (req, res) => {
     res.json({ pong: true, time: new Date().toISOString() });
@@ -595,9 +600,10 @@ async function startServer() {
      const distPath = path.join(process.cwd(), 'dist');
      app.use(express.static(distPath));
      
-    // IMPORTANT: Catch-all should only apply to non-API and non-asset routes
+     // IMPORTANT: Catch-all should only apply to non-API and non-asset routes
     app.all('*', (req, res, next) => {
-      const isApiRequest = req.path.startsWith('/api/');
+      // More robust check for API requests and assets
+      const isApiRequest = req.path.startsWith('/api') || req.originalUrl.startsWith('/api');
       const looksLikeAsset = req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|map|tsx|ts)$/);
       
       if (isApiRequest || looksLikeAsset) {
