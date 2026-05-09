@@ -582,7 +582,7 @@ async function startServer() {
   });
 
   // Mount API Router
-  app.use('/api', apiRouter);
+  app.use('/api/', apiRouter);
 
   // --- VITE MIDDLEWARE / STATIC ASSETS ---
  
@@ -613,15 +613,6 @@ async function startServer() {
     });
    }
 
-   // API 404 Handler (Global Fallback for anything hitting /api)
-   app.use('/api', (req, res) => {
-     console.warn(`[Global API 404] ${req.method} ${req.originalUrl}`);
-     res.status(404).json({ 
-       error: 'API endpoint not found', 
-       path: req.originalUrl,
-       method: req.method
-     });
-   });
 
    // Global Error Handler - ensure it ALWAYS returns JSON for /api requests
    app.use((err: any, req: any, res: any, next: any) => {
