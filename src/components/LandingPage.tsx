@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import vehicleImg from '../assets/images/safari_vehicle_gallery_1777014805076.png';
 import { 
   Compass, ShieldCheck, Zap, 
   Globe, ArrowRight, FileText, Bookmark,
@@ -159,6 +160,8 @@ const LandingPage: React.FC<LandingPageProps> = ({
     }
   ];
 
+  const heroImage = branding.heroImage || "https://images.unsplash.com/photo-1516426122078-c23e76319801?auto=format&fit=crop&q=80&w=1000";
+  
   return (
     <div className="min-h-screen bg-safari-50 text-safari-900 selection:bg-safari-200 scroll-smooth">
       {/* Navigation */}
@@ -663,7 +666,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
                 <div className="break-inside-avoid">
                   <img 
-                    src="/src/assets/images/safari_vehicle_gallery_1777014805076.png" 
+                    src={vehicleImg} 
                     alt="Safari vehicle" 
                     className="rounded-2xl w-full object-cover shadow-md hover:scale-[1.02] transition-transform duration-500" 
                   />

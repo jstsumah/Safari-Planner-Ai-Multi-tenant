@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import compression from 'compression';
 import helmet from 'helmet';
+import morgan from 'morgan';
 import { expand } from 'dotenv-expand';
 import { createServer as createViteServer } from 'vite';
 
@@ -127,16 +128,20 @@ async function startServer() {
   app.use(cors());
   app.use(express.json({ limit: '10mb' }));
   
+  // Use Morgan for logging, skipping source files
+  app.use(morgan(':method :url :status :res[content-length] - :response-time ms', {
+    skip: (req, res) => req.path.startsWith('/src/')
+  }));
+
   const MAILERSEND_API_KEY = process.env.MAILERSEND_API_KEY;
   const MAILERSEND_FROM_EMAIL = process.env.MAILERSEND_FROM_EMAIL;
 
   // --- API ROUTES ---
   const apiRouter = express.Router();
 
-  // LOG ALL API REQUESTS IN PRODUCTION FOR DIAGNOSTICS
-  apiRouter.use((req, res, next) => {
-    console.log(`[API] ${req.method} ${req.path}`);
-    next();
+  // DEBUG ENDPOINT MOUNTED FIRST
+  apiRouter.get('/ping', (req, res) => {
+    res.json({ pong: true, time: new Date().toISOString() });
   });
 
   apiRouter.get('/health', (req, res) => {
@@ -267,6 +272,10 @@ async function startServer() {
   });
 
   // --- Paystack Implementation ---
+  apiRouter.get('/checkout/init', (req, res) => {
+    res.json({ message: "Paystack initialization endpoint exists. Use POST to initiate a checkout.", method: req.method });
+  });
+
   apiRouter.post('/checkout/init', async (req, res) => {
     // Ensure we start with a JSON content type
     res.setHeader('Content-Type', 'application/json');
@@ -574,6 +583,7 @@ async function startServer() {
  
    if (process.env.NODE_ENV !== 'production') {
      const vite = await createViteServer({
+       root: process.cwd(),
        server: { 
          middlewareMode: true,
          hmr: false
@@ -585,11 +595,27 @@ async function startServer() {
      const distPath = path.join(process.cwd(), 'dist');
      app.use(express.static(distPath));
      
-     // IMPORTANT: Catch-all should only apply to non-API routes
-     app.get('*', (req, res) => {
-       res.sendFile(path.join(distPath, 'index.html'));
-     });
+    // IMPORTANT: Catch-all should only apply to non-API and non-asset routes
+    app.get('*', (req, res, next) => {
+      const isApiRequest = req.path.startsWith('/api/');
+      const looksLikeAsset = req.path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|map)$/);
+      
+      if (isApiRequest || looksLikeAsset) {
+        return next();
+      }
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
    }
+
+   // API 404 Handler (Global Fallback for anything hitting /api)
+   app.use('/api', (req, res) => {
+     console.warn(`[Global API 404] ${req.method} ${req.originalUrl}`);
+     res.status(404).json({ 
+       error: 'API endpoint not found', 
+       path: req.originalUrl,
+       method: req.method
+     });
+   });
 
    // Global Error Handler - ensure it ALWAYS returns JSON for /api requests
    app.use((err: any, req: any, res: any, next: any) => {

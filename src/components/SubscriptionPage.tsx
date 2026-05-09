@@ -39,6 +39,8 @@ export const SubscriptionPage = () => {
       let data;
       const contentType = response.headers.get('content-type');
       
+      console.log(`[Subscription] Response status: ${response.status}, type: ${contentType}`);
+      
       if (contentType && contentType.includes('application/json')) {
         try {
           data = JSON.parse(text);
@@ -48,11 +50,11 @@ export const SubscriptionPage = () => {
         }
       } else {
         console.error('Unexpected response content type:', contentType);
-        console.error('Response preview:', text.substring(0, 500));
+        console.error('Response body:', text.substring(0, 500));
         
         // If preferred failed, try fallback
-        if (preferredGateway === 'pesapal') {
-           console.log('[Subscription] PesaPal failed or missing, trying Paystack fallback...');
+        if (preferredGateway === 'pesapal' && !response.ok) {
+           console.log('[Subscription] PesaPal failed with non-JSON, trying Paystack fallback...');
            endpoint = '/api/checkout/init';
            const retryRes = await fetch(endpoint, {
              method: 'POST',
@@ -63,17 +65,22 @@ export const SubscriptionPage = () => {
            const retryType = retryRes.headers.get('content-type');
            if (retryType?.includes('application/json')) {
              data = JSON.parse(retryText);
-             if (!retryRes.ok) throw new Error(data?.error || `Paystack Error: ${retryRes.status}`);
+             if (!retryRes.ok) throw new Error(data?.error || data?.message || `Paystack Error: ${retryRes.status}`);
            } else {
-             throw new Error('All payment gateways failed to respond correctly.');
+             throw new Error(`All payment gateways returned unexpected formats. (Last status: ${retryRes.status})`);
            }
         } else {
-          throw new Error('Server returned an unexpected response format during checkout initialization.');
+          throw new Error(`Server returned an unexpected response format [${contentType || 'unknown'}] (Status: ${response.status})`);
         }
       }
  
-      if (!response.ok && !data) { // If fallback succeeded, data will be set
-        throw new Error(data?.error || `Server Error: ${response.status}`);
+      if (!response.ok) { 
+        throw new Error(data?.error || data?.message || `Server Error: ${response.status}`);
+      }
+      
+      // Additional safety check: If it was a 404, throw even if data exists (e.g. catch-all JSON)
+      if (response.status === 404 && !data?.authorization_url && !data?.redirect_url) {
+        throw new Error(data?.error || 'Payment initialization endpoint not found (404). Please contact support.');
       }
 
       const authUrl = data.authorization_url || data.redirect_url || data.url;
