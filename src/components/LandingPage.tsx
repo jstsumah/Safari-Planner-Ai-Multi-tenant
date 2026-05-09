@@ -428,73 +428,45 @@ const LandingPage: React.FC<LandingPageProps> = ({
         </section>
       )}
 
-      {/* Partners Side Scroll Section */}
-      <section className="py-20 bg-white border-b border-safari-100 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 mb-10 flex items-end justify-between">
-          <div className="space-y-4">
-            <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-safari-400">Our Network</h2>
-            <h3 className="text-3xl md:text-4xl font-extrabold text-safari-900 tracking-tight">Verified Agency Partners</h3>
-          </div>
-          <button 
-            onClick={onViewPartners}
-            className="flex items-center gap-2 text-safari-600 font-bold text-xs uppercase tracking-widest hover:text-safari-900 transition-colors group"
-          >
-            View All Partners <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-          </button>
-        </div>
-
-        <div className="relative group/slideshow">
-          {/* Arrow Navigation */}
-          <div className="absolute inset-y-0 left-6 flex items-center z-20">
+      {/* Partners Section - Grid to match other sections */}
+      <section className="py-24 bg-white border-b border-safari-100">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="mb-14 flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="space-y-4 max-w-2xl">
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.3em] text-safari-400">Our Network</h2>
+              <h3 className="text-3xl md:text-5xl font-extrabold text-safari-900 tracking-tight leading-tight">Verified Agency Partners</h3>
+              <p className="text-safari-600 font-medium text-lg leading-relaxed">
+                Connect with professional tour operators and accommodation providers who utilize our technology to deliver elite safari experiences.
+              </p>
+            </div>
             <button 
-              onClick={() => handleManualScroll('left')}
-              className="p-3 bg-white border border-safari-100 rounded-full shadow-lg text-safari-600 hover:bg-safari-900 hover:text-white hover:border-safari-900 transition-all opacity-0 group-hover/slideshow:opacity-100 -translate-x-4 group-hover/slideshow:translate-x-0"
+              onClick={onViewPartners}
+              className="flex items-center gap-2 text-safari-900 font-black text-xs uppercase tracking-widest hover:translate-x-1 transition-transform group whitespace-nowrap bg-safari-50 px-6 py-3 rounded-lg border border-safari-100"
             >
-              <ChevronLeft size={20} />
-            </button>
-          </div>
-          <div className="absolute inset-y-0 right-6 flex items-center z-20">
-            <button 
-              onClick={() => handleManualScroll('right')}
-              className="p-3 bg-white border border-safari-100 rounded-full shadow-lg text-safari-600 hover:bg-safari-900 hover:text-white hover:border-safari-900 transition-all opacity-0 group-hover/slideshow:opacity-100 translate-x-4 group-hover/slideshow:translate-x-0"
-            >
-              <ChevronRight size={20} />
+              View Full Directory <ArrowRight size={18} className="text-safari-400" />
             </button>
           </div>
 
-          <div 
-            ref={scrollRef}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-            className="flex gap-12 overflow-x-auto pb-8 px-6 no-scrollbar transition-all scroll-smooth"
-            style={{ msOverflowStyle: 'none', scrollbarWidth: 'none' }}
-          >
-            {/* Duplication for seamless scrolling removed to handle manual scroll better, or we can keep it if we adjust logic */}
-            {slideshowPartners.map((partner, idx) => (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+            {slideshowPartners.slice(0, 10).map((partner, idx) => (
               <div 
                 key={`${partner.id}-${idx}`} 
-                className="flex-shrink-0 w-64 bg-safari-50 p-6 rounded-2xl border border-safari-100 hover:shadow-xl hover:shadow-safari-900/5 transition-all group/card flex flex-col items-center justify-center text-center space-y-4 grayscale hover:grayscale-0"
+                className="bg-white p-6 rounded-2xl border border-safari-100 hover:border-safari-900/20 hover:shadow-xl hover:shadow-safari-900/5 transition-all group/card flex flex-col items-center justify-center text-center space-y-4"
               >
-                <div className="w-24 h-16 bg-white rounded-xl flex items-center justify-center text-safari-400 overflow-hidden border border-safari-50">
+                <div className="w-full aspect-[4/3] bg-safari-50/50 rounded-xl flex items-center justify-center text-safari-300 overflow-hidden group-hover/card:bg-white transition-colors">
                   {partner.logoUrl ? (
-                    <img src={partner.logoUrl} alt={partner.name} className="max-w-full max-h-full object-contain" />
+                    <img src={partner.logoUrl} alt={partner.name} className="max-w-[70%] max-h-[70%] object-contain" />
                   ) : (
-                    <Building2 size={32} />
+                    <Building2 size={32} className="opacity-40" />
                   )}
                 </div>
-                <div>
-                  <h4 className="text-sm font-black text-safari-900 px-2 truncate w-full">{partner.name}</h4>
-                </div>
+                <h4 className="text-xs font-black text-safari-900 px-2 truncate w-full uppercase tracking-wider">{partner.name}</h4>
               </div>
             ))}
-            {slideshowPartners.length === 0 && Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="flex-shrink-0 w-64 h-32 bg-safari-50 rounded-2xl border border-safari-50 animate-pulse" />
+            {slideshowPartners.length === 0 && Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-40 bg-safari-50/50 rounded-2xl border border-safari-100 animate-pulse" />
             ))}
           </div>
-          
-          {/* Gradient Overlays for smooth blend */}
-          <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-white to-transparent pointer-events-none z-10" />
-          <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-white to-transparent pointer-events-none z-10" />
         </div>
       </section>
 

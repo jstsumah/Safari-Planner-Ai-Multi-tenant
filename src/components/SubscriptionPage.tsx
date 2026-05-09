@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
-import { Check, Zap, Globe, Shield, Star, BarChart3, CloudUpload, Infinity as InfinityIcon } from 'lucide-react';
+import { Check, Zap, Globe, Shield, Star, BarChart3, CloudUpload, Infinity as InfinityIcon, ArrowLeft, Home } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { toast } from 'sonner';
 
@@ -17,10 +17,10 @@ export const SubscriptionPage = () => {
     const toastId = toast.loading('Initiating secure checkout...');
 
     try {
-      const response = await fetch('/api/pesapal/submit-order', {
+      const response = await fetch('/api/checkout/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, companyId: company.id })
+        body: JSON.stringify({ plan, companyId: company.id, email: company.email || '' })
       });
       
       const text = await response.text();
@@ -32,22 +32,75 @@ export const SubscriptionPage = () => {
           data = JSON.parse(text);
         } catch (err) {
           console.error('Failed to parse JSON response:', text.substring(0, 500));
-          throw new Error('Server returned an invalid JSON response. Please try again or contact support.');
+          throw new Error('Server returned an invalid JSON response.');
         }
       } else {
-        console.error('Expected JSON but received:', text.substring(0, 500));
-        throw new Error('Server returned an unexpected response format (not JSON). Please try again later.');
+        throw new Error('Server returned an unexpected response format.');
       }
  
       if (!response.ok) {
         throw new Error(data?.error || `Server Error: ${response.status}`);
       }
 
-      if (data.redirect_url) {
-        toast.success('Redirecting to PesaPal...', { id: toastId });
-        window.location.href = data.redirect_url;
+      if (data.authorization_url) {
+        toast.success('Opening secure payment window...', { id: toastId });
+        
+        // Open in a popup if possible, otherwise fallback to current window
+        const width = 600;
+        const height = 800;
+        const left = (window.screen.width / 2) - (width / 2);
+        const top = (window.screen.height / 2) - (height / 2);
+        
+        const popup = window.open(
+          data.authorization_url, 
+          'SafariPlannerPayment', 
+          `width=${width},height=${height},top=${top},left=${left},scrollbars=yes,status=yes`
+        );
+
+        if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+          // Popup blocked - fallback to same window
+          window.location.href = data.authorization_url;
+        } else {
+          // Listen for message from the popup
+          const messageHandler = (event: MessageEvent) => {
+            // Validate origin for security
+            if (event.data?.type === 'PAYMENT_SUCCESS') {
+              toast.success('Payment verified successfully!', { id: toastId });
+              window.removeEventListener('message', messageHandler);
+              // Refresh page to show new status
+              window.location.href = '/?view=admin';
+            } else if (event.data?.type === 'PAYMENT_ERROR') {
+              toast.error(event.data.error || 'Payment failed.', { id: toastId });
+              window.removeEventListener('message', messageHandler);
+            }
+          };
+          window.addEventListener('message', messageHandler);
+
+          // Optional: Polling as fallback if message fails
+          const timer = setInterval(async () => {
+            if (popup.closed) {
+              clearInterval(timer);
+              window.removeEventListener('message', messageHandler);
+              
+              const { data: refreshedCompany, error: pollError } = await supabase
+                .from('companies')
+                .select('branding')
+                .eq('id', company.id)
+                .single();
+                
+              if (!pollError && refreshedCompany?.branding?.subscription_status === 'active') {
+                toast.success('Subscription detected and activated!', { id: toastId });
+                setTimeout(() => {
+                  window.location.href = '/?view=admin';
+                }, 1500);
+              } else {
+                toast.dismiss(toastId);
+              }
+            }
+          }, 2000);
+        }
       } else {
-        throw new Error('No redirect URL returned from PesaPal');
+        throw new Error('No checkout URL returned from Paystack');
       }
     } catch (error: any) {
       console.error('Subscription error:', error);
@@ -97,6 +150,24 @@ export const SubscriptionPage = () => {
   return (
     <div className="min-h-screen bg-[#FDFCFB] py-12 px-6">
       <div className="max-w-6xl mx-auto space-y-16">
+        <div className="flex justify-between items-center -mb-8">
+          <button 
+            onClick={() => window.location.href = '/?view=admin'}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-safari-200 text-safari-600 rounded-xl font-black uppercase text-[10px] tracking-widest hover:bg-safari-50 transition-all shadow-sm group"
+          >
+            <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+            Back to Dashboard
+          </button>
+          
+          <button 
+            onClick={() => window.location.href = '/'}
+            className="hidden sm:flex items-center gap-2 px-4 py-2 text-safari-400 hover:text-safari-900 transition-colors font-black uppercase text-[10px] tracking-widest"
+          >
+            <Home size={14} />
+            Home
+          </button>
+        </div>
+
         <header className="text-center space-y-4 max-w-2xl mx-auto">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}

@@ -100,18 +100,15 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
   React.useEffect(() => {
     if (authLoading) return; // Wait for initial auth check
 
-    let subscription: { unsubscribe: () => void } | null = null;
-
-    const setupAuthEvents = async () => {
-      const { data } = supabase.auth.onAuthStateChange(async (event) => {
-        if (event === 'PASSWORD_RECOVERY') {
-          setView('reset');
-        }
-      });
-      subscription = data.subscription;
-    };
-
     const initUser = async () => {
+      // Skip onboarding checks if we are in a recovery flow or profile is still loading via context
+      if (authLoading || 
+          window.location.hash.includes('type=recovery') || 
+          window.location.hash.includes('access_token=') || 
+          window.location.search.includes('type=recovery')) {
+        return;
+      }
+
       // If we are LOGGING IN (not signing up) and user exists, check status
       if (user && !isSignUp) {
         // If profile exists, check if they are already setup
@@ -120,16 +117,18 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
             onComplete?.(profile.user_type);
             return;
           }
+        } else {
+          // If user exists but profile is missing, wait a bit for AuthContext to finish or retry
+          // This prevents "registration prompt" flickering for slow network/profile loading
+          return;
         }
 
-        // Only check join status if currently in the auth view (initial detection stage)
+        // Only check join status if currently in the auth view
         if (view === 'auth') {
           const joined = await checkJoiningStatus(user);
           if (!joined) {
-            // If we've confirmed they have no company after checking joins
             setView('company');
           } else {
-            // They logged in and are fully joined! Fix self-healing and trigger complete.
             await refreshProfile();
             if (onComplete) {
               const utype = user.user_metadata?.user_type || (profile?.company_id ? 'agency' : 'user');
@@ -140,12 +139,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
       }
     };
 
-    setupAuthEvents();
     initUser();
 
-    return () => {
-      if (subscription) subscription.unsubscribe();
-    };
+    return () => {};
   }, [user, isSignUp, checkJoiningStatus, view, profile, onComplete, refreshProfile, authLoading]);
 
   const formatAuthError = (err: any) => {
@@ -254,20 +250,37 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
     setLoading(true);
     setError(null);
     try {
+      // First, try a robust check for email existence
+      // If we have any profile at all with this email, they exist
+      const { data: profileExists } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email.trim().toLowerCase())
+        .maybeSingle();
+
+      if (profileExists) {
+        setShowPasswordField(true);
+        setLoading(false);
+        return;
+      }
+
+      // Fallback to RPC if profile not found (might be missing due to RLS)
       const { data: exists, error: rpcError } = await supabase
         .rpc('check_email_exists', { email_to_check: email.trim().toLowerCase() });
 
-      if (rpcError) throw rpcError;
-
-      if (exists) {
+      if (!rpcError && exists) {
         setShowPasswordField(true);
-      } else {
-        // Check if they are invited but not yet registered in Auth
-        const { data: teamMember, error: tmError } = await supabase
-          .from('team_members')
-          .select('company_id, companies(name), user_type')
-          .eq('email', email.trim().toLowerCase())
-          .maybeSingle();
+        setLoading(false);
+        return;
+      }
+
+      // If both fail, check for invitation/not found
+      // Check if they are invited but not yet registered in Auth
+      const { data: teamMember } = await supabase
+        .from('team_members')
+        .select('company_id, companies(name), user_type')
+        .eq('email', email.trim().toLowerCase())
+        .maybeSingle();
 
         if (teamMember) {
           setError("Invitation found! Redirecting you to activate your account...");
@@ -292,13 +305,12 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
             setError(null);
           }, 800);
         }
+      } catch (err: any) {
+        setError(formatAuthError(err));
+      } finally {
+        setLoading(false);
       }
-    } catch (err: any) {
-      setError(formatAuthError(err));
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -312,37 +324,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
       if (error) throw error;
       if (data.user) {
         setLocalUser(data.user);
-        // We don't set view to 'company' here anymore. 
-        // We let the useEffect with initUser handle the logic 
-        // once profile and joining status are checked.
         await refreshProfile();
       }
     } catch (err: any) {
-      const errMsg = err.message || '';
-      if (errMsg.toLowerCase().includes('invalid login credentials') || errMsg.toLowerCase().includes('not found')) {
-        // Double check if they have an invitation but didn't activate yet
-        const { data: teamMember } = await supabase
-          .from('team_members')
-          .select('company_id, companies(name), user_type')
-          .eq('email', email.trim().toLowerCase())
-          .maybeSingle();
-
-        if (teamMember) {
-          setError("Invitation found! Redirecting to activation...");
-          setTimeout(() => {
-            setIsSignUp(true);
-            setStep(2);
-            setIsInvited(true);
-            setInvitedCompany({ 
-              id: teamMember.company_id, 
-              name: (teamMember as any).companies?.name || 'Your Company' 
-            });
-            if (teamMember.user_type) setRegType(teamMember.user_type as any);
-            setError(null);
-          }, 1500);
-          return;
-        }
-      }
       setError(formatAuthError(err));
     } finally {
       setLoading(false);

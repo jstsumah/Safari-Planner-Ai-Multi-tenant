@@ -13,7 +13,7 @@ import PartnersPage from './components/PartnersPage';
 import ResetPassword from './components/ResetPassword';
 import NotFound from './components/NotFound';
 import { SubscriptionPage } from './components/SubscriptionPage';
-import { PayPalSuccess } from './components/PayPalSuccess';
+import { PaymentStatus } from './components/PaymentStatus';
 import { PayPalCancel } from './components/PayPalCancel';
 import { useAuth } from './hooks/useAuth';
 import { SafariFormData, GeneratedItinerary, Lodge, BudgetTier, TransportType, BrandingConfig } from './types';
@@ -194,7 +194,7 @@ const App: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [viewMode, setViewMode] = useState<'landing' | 'form' | 'itinerary' | 'history' | 'admin' | 'calculator' | 'auth' | 'partners' | 'subscription' | 'success' | 'cancel' | 'reset-password' | 'not-found'>(() => {
-    if (window.location.pathname === '/success') return 'success';
+    if (window.location.pathname === '/payment-complete') return 'success';
     if (window.location.pathname === '/cancel') return 'cancel';
 
     // Handle 404 for unrecognized paths (if not at root)
@@ -220,10 +220,11 @@ const App: React.FC = () => {
     if (params.get('master') || params.get('itin')) return 'itinerary';
     if (params.get('tool') === 'calculator') return 'calculator';
     if (params.get('tool') === 'planner') return 'form';
+    if (params.get('view')) return params.get('view') as any;
 
     // Priority: Saved viewMode if we were already in an active session
     const savedView = sessionStorage.getItem('safari_viewMode');
-    if (savedView && ['form', 'itinerary', 'history', 'admin', 'calculator', 'partners', 'subscription', 'success', 'cancel'].includes(savedView)) {
+    if (savedView && ['form', 'itinerary', 'history', 'admin', 'calculator', 'partners', 'subscription', 'success', 'cancel', 'reset-password'].includes(savedView)) {
       return savedView as any;
     }
 
@@ -728,7 +729,7 @@ const App: React.FC = () => {
     }
     
     if (viewMode === 'success') {
-      return <PayPalSuccess />;
+      return <PaymentStatus />;
     }
     
     if (viewMode === 'cancel') {
@@ -736,7 +737,14 @@ const App: React.FC = () => {
     }
 
     if (viewMode === 'reset-password') {
-      return <ResetPassword onComplete={() => setViewMode('auth')} />;
+      return <ResetPassword onComplete={() => {
+        if (user && profile) {
+          const type = profile.user_type || 'user';
+          navigateToView(type === 'user' ? 'history' : 'admin');
+        } else {
+          navigateToView('landing');
+        }
+      }} />;
     }
 
     if (viewMode === 'not-found') {

@@ -76,7 +76,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setProfile(profileWithCompany);
       setCompany(profileWithCompany?.company || null);
     } catch (error: any) {
-      console.error('Error fetching profile/company:', error.message || error);
+      if (error.message?.includes('Failed to fetch') || error.name === 'TypeError') {
+        const errorMsg = 'Network Error: Failed to reach Supabase. Please check your internet connection or disable adblockers.';
+        console.error(errorMsg);
+        // We use a console.warn instead of a full toast to avoid spamming, 
+        // but we'll try to notify once if it's a persistent issue.
+      } else {
+        console.error('Error fetching profile/company:', error.message || error);
+      }
     } finally {
       setLoading(false);
       isFetchingRef.current = false;

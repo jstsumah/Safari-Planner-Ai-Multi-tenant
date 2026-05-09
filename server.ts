@@ -31,6 +31,8 @@ const PESAPAL_CONSUMER_SECRET = (process.env.PESAPAL_CONSUMER_SECRET || '').trim
 const PESAPAL_RAW_MODE = (process.env.PESAPAL_MODE || 'sandbox').trim().toLowerCase();
 const PESAPAL_MODE = (PESAPAL_RAW_MODE === 'production' || PESAPAL_RAW_MODE === 'live') ? 'production' : 'sandbox';
 const PESAPAL_IPN_ID = (process.env.PESAPAL_IPN_ID || '').trim();
+const PAYSTACK_SECRET_KEY = (process.env.PAYSTACK_SECRET_KEY || '').trim();
+const PAYSTACK_CURRENCY = (process.env.PAYSTACK_CURRENCY || 'KES').trim().toUpperCase();
 
 const PESAPAL_URL = PESAPAL_MODE === 'production' 
   ? 'https://pay.pesapal.com/v3'
@@ -184,10 +186,13 @@ async function startServer() {
       // PesaPal V3 reference limit is usually 50 chars. SP (2) + "-" (1) + UUID (36) = 39 chars.
       const merchantReference = `SP-${companyId}`;
       
-      // Use full URL if available, otherwise try to construct it or use a placeholder
-      const baseUrl = process.env.APP_URL || process.env.SHARED_APP_URL || "";
-      // Use /success as it's already a route in App.tsx
-      const callbackUrl = baseUrl ? `${baseUrl}/success` : "https://safariplanner.style-upsystems.com/success";
+      // Try to determine the base URL dynamically from the request
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.get('host');
+      const dynamicBaseUrl = `${protocol}://${host}`;
+      
+      const baseUrl = process.env.APP_URL || process.env.SHARED_APP_URL || dynamicBaseUrl;
+      const callbackUrl = `${baseUrl}/payment-complete`;
 
       console.log(`[PesaPal] Using IPN_ID: [${PESAPAL_IPN_ID}]`);
       console.log(`[PesaPal] Using Callback URL: [${callbackUrl}]`);
@@ -261,8 +266,122 @@ async function startServer() {
     }
   });
 
+  // --- Paystack Implementation ---
+  apiRouter.post('/checkout/init', async (req, res) => {
+    const { plan, companyId, email } = req.body;
+    
+    // Default prices in USD
+    let baseAmount = plan === 'pro' ? 60.00 : 30.00;
+    
+    // If currency is KES, convert roughly (1 USD = 135 KES - example rate)
+    // In a real app, you'd use an exchange rate API or have fixed local prices.
+    if (PAYSTACK_CURRENCY === 'KES') {
+      baseAmount = plan === 'pro' ? 7800.00 : 3900.00;
+    } else if (PAYSTACK_CURRENCY === 'NGN') {
+      baseAmount = plan === 'pro' ? 90000.00 : 45000.00; // Example NGN rates
+    }
+    
+    const amount = Math.round(baseAmount * 100); // Paystack expects amount in cents/subunit
+
+    if (!PAYSTACK_SECRET_KEY) {
+      return res.status(500).json({ error: 'Paystack is not configured on the server.' });
+    }
+
+    try {
+      const merchantReference = `SP-${companyId}-${Date.now()}`;
+      
+      // Try to determine the base URL dynamically from the request if environment variables are missing
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.get('host');
+      const dynamicBaseUrl = `${protocol}://${host}`;
+      
+      const baseUrl = process.env.APP_URL || process.env.SHARED_APP_URL || dynamicBaseUrl;
+      const callbackUrl = `${baseUrl}/payment-complete`;
+
+      console.log(`[Paystack] Initializing transaction: ${amount} ${PAYSTACK_CURRENCY}`);
+      console.log(`[Paystack] Using Callback URL: [${callbackUrl}]`);
+      console.log(`[Paystack] Using Merchant Ref: [${merchantReference}]`);
+
+      const response = await fetch('https://api.paystack.co/transaction/initialize', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: email || "billing@wildrhythm.com",
+          amount: amount,
+          currency: PAYSTACK_CURRENCY,
+          reference: merchantReference,
+          callback_url: callbackUrl,
+          metadata: {
+            plan,
+            companyId,
+            custom_fields: [
+              {
+                display_name: "Plan",
+                variable_name: "plan",
+                value: plan
+              },
+              {
+                display_name: "Company ID",
+                variable_name: "company_id",
+                value: companyId
+              }
+            ]
+          }
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        console.error('[Paystack] API Error Response:', data);
+        throw new Error(data.message || 'Paystack initialization failed');
+      }
+
+      res.json(data.data); // data.data contains authorization_url and reference
+    } catch (error: any) {
+      console.error('Paystack Initialization Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  apiRouter.get('/checkout/confirm/:reference', async (req, res) => {
+    const { reference } = req.params;
+    console.log(`[Paystack] Verifying transaction: ${reference}`);
+
+    if (!PAYSTACK_SECRET_KEY) {
+      console.error('[Paystack] Secret key missing during verification');
+      return res.status(500).json({ error: 'Paystack is not configured.' });
+    }
+
+    try {
+      const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`
+        }
+      });
+
+      const data = await response.json();
+      console.log(`[Paystack] Verify API Status: ${response.status}`);
+      console.log(`[Paystack] Verify API Data Status: ${data.status}`);
+      
+      if (!response.ok) {
+        console.error('[Paystack] Verification API error:', data);
+        throw new Error(data.message || 'Paystack verification failed');
+      }
+
+      res.json(data.data);
+    } catch (error: any) {
+      console.error('Paystack Verification Error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   apiRouter.get('/pesapal/transaction-status', async (req, res) => {
     const { OrderTrackingId } = req.query;
+    console.log(`[PesaPal] Getting status for: ${OrderTrackingId}`);
     if (!OrderTrackingId) return res.status(400).json({ error: 'OrderTrackingId is required' });
 
     try {
@@ -283,7 +402,11 @@ async function startServer() {
       }
 
       const data = await response.json();
+      console.log(`[PesaPal] Status API Status: ${response.status}`);
+      console.log(`[PesaPal] Status API Data Status: ${data.status_code} (${data.payment_status_description})`);
+
       if (!response.ok) {
+        console.error('[PesaPal] Status API error:', data);
         throw new Error(data.error?.message || 'Failed to get PesaPal transaction status');
       }
 
