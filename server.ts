@@ -113,9 +113,8 @@ async function getPesaPalToken() {
   }
 }
 
-async function startServer() {
-  const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+const app = express();
+const PORT = Number(process.env.PORT) || 3000;
 
   // Security headers
   app.use(helmet({
@@ -596,16 +595,22 @@ async function startServer() {
   // --- VITE MIDDLEWARE / STATIC ASSETS ---
  
    if (process.env.NODE_ENV !== 'production') {
-     const { createServer: createViteServer } = await import('vite');
-     const vite = await createViteServer({
-       root: process.cwd(),
-       server: { 
-         middlewareMode: true,
-         hmr: false
-       },
-       appType: 'spa',
-     });
-     app.use(vite.middlewares);
+     (async () => {
+       try {
+         const { createServer: createViteServer } = await import('vite');
+         const vite = await createViteServer({
+           root: process.cwd(),
+           server: { 
+             middlewareMode: true,
+             hmr: false
+           },
+           appType: 'spa',
+         });
+         app.use(vite.middlewares);
+       } catch (err) {
+         console.error('Failed to start Vite dev server:', err);
+       }
+     })();
    } else {
      const distPath = path.join(process.cwd(), 'dist');
      app.use(express.static(distPath));
@@ -642,9 +647,10 @@ async function startServer() {
      res.status(500).send('An internal server error occurred.');
    });
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
-  });
-}
+  if (!process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on http://0.0.0.0:${PORT}`);
+    });
+  }
 
-startServer();
+export default app;
