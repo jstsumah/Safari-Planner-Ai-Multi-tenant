@@ -592,7 +592,7 @@ async function startServer() {
   });
 
   // Mount API Router
-  app.use('/api/', apiRouter);
+  app.use('/api', apiRouter);
 
   // --- VITE MIDDLEWARE / STATIC ASSETS ---
  
@@ -626,7 +626,7 @@ async function startServer() {
 
    // Global Error Handler - ensure it ALWAYS returns JSON for /api requests
    app.use((err: any, req: any, res: any, next: any) => {
-     const isApiRequest = req.path.startsWith('/api/') || req.originalUrl.startsWith('/api/');
+     const isApiRequest = req.path.startsWith('/api') || req.originalUrl.startsWith('/api');
      console.error(`[Global Error] ${req.method} ${req.originalUrl}:`, err);
      
      if (isApiRequest) {
