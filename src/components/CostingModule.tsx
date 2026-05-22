@@ -159,7 +159,7 @@ const CostingModule: React.FC<CostingModuleProps> = ({
       }
 
       const ai = new GoogleGenAI({ apiKey });
-      const modelId = 'gemini-3-flash-preview';
+      const modelId = 'gemini-3.5-flash';
 
       const prompt = `
         You are an expert safari operations assistant. 
