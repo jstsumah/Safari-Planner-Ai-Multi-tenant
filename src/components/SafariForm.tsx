@@ -157,7 +157,7 @@ const SafariForm: React.FC<SafariFormProps> = ({ onSubmit, isLoading, initialDat
   }
 
   return (
-    <div className="bg-white rounded-md shadow-xl overflow-hidden max-w-4xl mx-auto border border-safari-200">
+    <div className="bg-white rounded-md shadow-xl overflow-hidden w-full max-w-4xl mx-auto border border-safari-200">
       {/* Progress Bar */}
       <div className="bg-safari-100 p-4 border-b border-safari-200">
         <div className="flex justify-between items-center">
@@ -576,49 +576,61 @@ const SafariForm: React.FC<SafariFormProps> = ({ onSubmit, isLoading, initialDat
 
         {/* Step 6: Review */}
         {step === 6 && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-6 animate-fadeIn w-full">
             <h2 className="text-2xl font-extrabold text-safari-900">Review Your Plans</h2>
-            <div className="bg-white p-8 rounded-lg border border-safari-200 text-sm space-y-4 shadow-lg">
-              <div className="flex justify-between border-b border-safari-100 pb-3">
-                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px]">Traveler</span>
-                <span className="font-extrabold text-safari-900">
-                  {formData.name} ({formData.travelerStatus?.toUpperCase()}) from {formData.country}
+            <div className="bg-white rounded-lg border border-safari-200 text-sm divide-y divide-safari-100 overflow-hidden shadow-sm w-full">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-5 bg-white transition-colors hover:bg-safari-50/20">
+                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px] shrink-0">Traveler</span>
+                <span className="font-extrabold text-safari-900 text-left sm:text-right max-w-full sm:max-w-[70%]">
+                  {formData.name || 'Not Provided'} ({formData.travelerStatus?.toUpperCase()}) from {formData.country}
                 </span>
               </div>
-               <div className="flex justify-between border-b border-safari-100 pb-3">
-                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px]">Email</span>
-                <span className="font-extrabold text-safari-900">{formData.email}</span>
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-5 bg-white transition-colors hover:bg-safari-50/20">
+                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px] shrink-0">Email</span>
+                <span className="font-extrabold text-safari-900 text-left sm:text-right max-w-full sm:max-w-[70%] break-all">
+                  {formData.email || 'Not Provided'}
+                </span>
               </div>
-              <div className="flex justify-between border-b border-safari-100 pb-3">
-                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px]">Dates</span>
-                <span className="font-extrabold text-safari-900">{formData.startDate} for {formData.durationDays} Days</span>
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-5 bg-white transition-colors hover:bg-safari-50/20">
+                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px] shrink-0">Dates</span>
+                <span className="font-extrabold text-safari-900 text-left sm:text-right max-w-full sm:max-w-[70%]">
+                  {formData.startDate || 'Flexible Start'} for {formData.durationDays} Days
+                </span>
               </div>
-               <div className="flex justify-between border-b border-safari-100 pb-3">
-                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px]">Party Composition</span>
-                <span className="font-extrabold text-safari-900">{formData.adults} Adults, {formData.youngAdults} Teens, {formData.children} Children</span>
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-5 bg-white transition-colors hover:bg-safari-50/20">
+                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px] shrink-0">Party Composition</span>
+                <span className="font-extrabold text-safari-900 text-left sm:text-right max-w-full sm:max-w-[70%]">
+                  {formData.adults} {formData.adults === 1 ? 'Adult' : 'Adults'}
+                  {formData.youngAdults > 0 ? `, ${formData.youngAdults} Teens` : ''}
+                  {formData.children > 0 ? `, ${formData.children} Children` : ''}
+                </span>
               </div>
-              <div className="flex justify-between border-b border-safari-100 pb-3">
-                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px]">Destinations</span>
-                <span className="font-extrabold text-right text-safari-900 max-w-[200px]">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-5 bg-white transition-colors hover:bg-safari-50/20">
+                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px] shrink-0 mt-0.5">Destinations</span>
+                <span className="font-extrabold text-left sm:text-right text-safari-900 max-w-full sm:max-w-[70%]">
                   {formData.destinations.join(', ') || 'Planner Choice'}
                   {formData.customDestinations && `, ${formData.customDestinations}`}
                 </span>
               </div>
-              <div className="flex justify-between border-b border-safari-100 pb-3">
-                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px]">Budget Level</span>
-                <span className="font-extrabold text-safari-900">{formData.budget.split('(')[0]}</span>
-              </div>
-              {(formData.preferredAccommodations.length > 0 || formData.otherAccommodations) && (
-              <div className="flex justify-between border-b border-safari-100 pb-3">
-                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px]">Preferred Styles</span>
-                <span className="font-extrabold text-right text-safari-900 max-w-[200px]">
-                  {[...formData.preferredAccommodations, formData.otherAccommodations].filter(Boolean).join(', ')}
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-5 bg-white transition-colors hover:bg-safari-50/20">
+                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px] shrink-0">Budget Level</span>
+                <span className="font-extrabold text-safari-900 text-left sm:text-right max-w-full sm:max-w-[70%]">
+                  {formData.budget.split('(')[0]}
                 </span>
               </div>
+              {(formData.preferredAccommodations.length > 0 || formData.otherAccommodations) && (
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 p-5 bg-white transition-colors hover:bg-safari-50/20">
+                  <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px] shrink-0 mt-0.5">Preferred Styles</span>
+                  <span className="font-extrabold text-left sm:text-right text-safari-900 max-w-full sm:max-w-[70%]">
+                    {[...formData.preferredAccommodations, formData.otherAccommodations].filter(Boolean).join(', ')}
+                  </span>
+                </div>
               )}
-              <div className="flex justify-between">
-                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px]">Transport Mode</span>
-                <span className="font-extrabold text-safari-900">{formData.transport}</span>
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 p-5 bg-white transition-colors hover:bg-safari-50/20">
+                <span className="text-safari-500 font-bold uppercase tracking-wider text-[10px] shrink-0">Transport Mode</span>
+                <span className="font-extrabold text-safari-900 text-left sm:text-right max-w-full sm:max-w-[70%]">
+                  {formData.transport}
+                </span>
               </div>
             </div>
           </div>

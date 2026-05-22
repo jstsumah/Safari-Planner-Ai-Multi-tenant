@@ -644,7 +644,7 @@ const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies 
     {/* Storage Browser Modal */}
       {isStorageBrowserOpen && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-safari-950/90 backdrop-blur-xl animate-fadeIn p-4 md:p-8">
-          <div className="bg-white w-full max-w-6xl h-full max-h-[95vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-white/20 relative">
+          <div className="bg-white w-full max-w-6xl h-full max-h-[95vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-white/20 relative">
             {/* Header */}
             <div className="p-6 md:p-8 border-b border-safari-100 flex justify-between items-center bg-safari-50/80 sticky top-0 z-20 backdrop-blur-md">
               <div className="flex items-center gap-4">
@@ -687,7 +687,7 @@ const LodgeEditor: React.FC<LodgeEditorProps> = ({ lodge, customRate, companies 
                       <div 
                         key={idx} 
                         onClick={() => selectImage(img.url)}
-                        className={`group relative aspect-[4/5] rounded-[1.8rem] overflow-hidden transition-all duration-500 cursor-pointer shadow-md hover:shadow-2xl border-2 ${
+                        className={`group relative aspect-[4/5] rounded-2xl overflow-hidden transition-all duration-500 cursor-pointer shadow-md hover:shadow-2xl border-2 ${
                           isSelected ? 'border-safari-600 ring-8 ring-safari-600/10 scale-[0.98]' : 'border-transparent hover:border-safari-400 hover:-translate-y-1.5'
                         }`}
                       >

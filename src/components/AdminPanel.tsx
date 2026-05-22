@@ -5,11 +5,11 @@ import {
   Edit3, Home,
   LayoutDashboard, MessageSquare, Menu, ChevronLeft, ChevronDown, ChevronUp,
   RefreshCw, Compass, MapPin, Mail, Phone,
-  Eye, ReceiptText, FileText, CreditCard,
+  Eye, EyeOff, ReceiptText, FileText, CreditCard,
   Calculator, Bookmark, FileCheck, Wand2,
   Wallet, Settings as SettingsIcon, Palette,
   Share2, Check, Users, UserPlus, Type, Image as ImageIcon, HelpCircle, Quote, Database,
-  ShieldAlert, ShieldCheck, Upload, TrendingUp, ArrowUpRight, BarChart3, Activity, Clock, ArrowLeft, Link, Lock
+  ShieldAlert, ShieldCheck, Upload, TrendingUp, ArrowUpRight, BarChart3, Activity, Clock, ArrowLeft, Link, Lock, Star, Map
 } from 'lucide-react';
 import { 
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
@@ -215,13 +215,14 @@ const DEFAULT_BRANDING: BrandingConfig = {
   financeEmail: 'finance@safariplanner.ai'
 };
 
-type AdminTab = 'dashboard' | 'properties' | 'property_edit' | 'property_view' | 'leads' | 'costing' | 'quotations' | 'invoices' | 'invoice_editor' | 'payments' | 'receipts' | 'signature_safaris' | 'safari_edit' | 'calculator' | 'planner' | 'disbursements' | 'payment_vouchers' | 'settings' | 'itinerary_view' | 'team' | 'super_hub';
+type AdminTab = 'dashboard' | 'properties' | 'property_edit' | 'property_view' | 'leads' | 'costing' | 'quotations' | 'invoices' | 'invoice_editor' | 'payments' | 'receipts' | 'signature_safaris' | 'safari_edit' | 'calculator' | 'planner' | 'disbursements' | 'payment_vouchers' | 'settings' | 'itinerary_view' | 'team' | 'super_hub' | 'profile';
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const { user, profile, company, refreshProfile, signOut, resetPassword } = useAuth();
   
   // Navigation State
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const [profileSubTab, setProfileSubTab] = useState<'general' | 'contact' | 'assets' | 'stats'>('general');
   const [managedCompanyId, setManagedCompanyId] = useState<string | null>(null);
 
   const [tabHistory, setTabHistory] = useState<AdminTab[]>(['dashboard']);
@@ -250,6 +251,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [profileFullName, setProfileFullName] = useState(profile?.full_name || '');
   const [profilePhoneNumber, setProfilePhoneNumber] = useState(profile?.phone_number || '');
+  const [showPaypalSecret, setShowPaypalSecret] = useState(false);
+  const [showPesapalSecret, setShowPesapalSecret] = useState(false);
+  const [showStripeSecretKey, setShowStripeSecretKey] = useState(false);
+  const [showStripeWebhookSecret, setShowStripeWebhookSecret] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -277,17 +282,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
   const effectiveCompanyId = effectiveCompany?.id;
 
-  // Subscription & Trial Logic - Robust detection
-  const subStatus = effectiveCompany?.branding?.subscription_status || 
-                   (effectiveCompany as any)?.subscription_status || 
-                   (profile as any)?.subscription_status;
+  // Subscription & Trial Logic - Robust detection for general users (Super admins are fully activated systems and bypass all subscription limits/restrictions)
+  const baseSubStatus = effectiveCompany?.branding?.subscription_status || 
+                        (effectiveCompany as any)?.subscription_status || 
+                        (profile as any)?.subscription_status;
+
+  const subStatus = profile?.is_super_user ? 'active' : baseSubStatus;
                    
   const trialEndsAt = effectiveCompany?.branding?.trial_ends_at || 
                       (effectiveCompany as any)?.trial_ends_at || 
                       (profile as any)?.trial_ends_at;
 
-  const isTrial = subStatus === 'trial';
-  const trialExpired = isTrial && trialEndsAt && new Date(trialEndsAt) < new Date();
+  const isTrial = profile?.is_super_user ? false : (subStatus === 'trial');
+  const trialExpired = profile?.is_super_user ? false : (isTrial && trialEndsAt && new Date(trialEndsAt) < new Date());
   const daysRemaining = isTrial && trialEndsAt && !trialExpired
     ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : 0;
@@ -1314,6 +1321,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
         <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <NavItem icon={<Home size={22} />} label="Home" isActive={false} collapsed={isSidebarCollapsed} onClick={onClose} />
           <NavItem icon={<LayoutDashboard size={22} />} label="Dashboard" isActive={activeTab === 'dashboard'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('dashboard')} />
+          <NavItem icon={<Building2 size={22} />} label="My Profile" isActive={activeTab === 'profile'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('profile')} />
           <NavItem icon={<Building size={22} />} label="Properties" isActive={activeTab === 'properties' || activeTab === 'property_edit' || activeTab === 'property_view'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('properties')} />
           <NavItem icon={<Bookmark size={22} />} label="Signature Safaris" isActive={activeTab === 'signature_safaris' || activeTab === 'safari_edit'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('signature_safaris')} />
           <NavItem icon={<Users size={22} />} label="Team" isActive={activeTab === 'team'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('team')} />
@@ -1352,27 +1360,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
 
           <NavItem icon={<Wand2 size={22} />} label="Quick Costing" isActive={activeTab === 'calculator'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('calculator')} />
           <NavItem icon={<Compass size={22} />} label="Quick Planner" isActive={activeTab === 'planner'} collapsed={isSidebarCollapsed} onClick={() => navigateToTab('planner')} />
-          
-          {profile?.is_super_user && (
-            <div className="pt-4 mt-4 border-t border-safari-800">
-              <p className="px-3 mb-2 text-[10px] font-black uppercase text-safari-500 tracking-widest">Admin Oversight</p>
-              <NavItem 
-                icon={<Database size={22} className="text-amber-400" />} 
-                label="Super Hub" 
-                isActive={activeTab === 'super_hub'} 
-                collapsed={isSidebarCollapsed} 
-                onClick={() => navigateToTab('super_hub')} 
-              />
-            </div>
-          )}
         </nav>
 
         <div className={`px-7 py-6 border-t border-safari-800 flex items-center gap-6 ${isSidebarCollapsed ? 'flex-col' : 'justify-start'}`}>
-          <Tooltip content="Company Public Profile">
-            <button onClick={() => setIsProfileOpen(true)} className="text-safari-400 hover:text-white transition-colors">
-              <Building2 size={20} />
-            </button>
-          </Tooltip>
+          {profile?.is_super_user && (
+            <Tooltip content="Super Hub">
+              <button 
+                onClick={() => navigateToTab('super_hub')} 
+                className={`transition-colors ${activeTab === 'super_hub' ? 'text-white' : 'text-safari-400 hover:text-white'}`}
+              >
+                <Database size={20} className={activeTab === 'super_hub' ? 'text-amber-400' : ''} />
+              </button>
+            </Tooltip>
+          )}
 
           <Tooltip content="Configuration Settings">
             <button 
@@ -1896,6 +1896,493 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
             branding={branding} 
             onClose={() => setIsProfileOpen(false)} 
           />
+        )}        {activeTab === 'profile' && (
+          <div className="p-8 max-w-7xl mx-auto space-y-8 animate-fadeIn overflow-y-auto h-[calc(100vh-5rem)] no-scrollbar">
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-safari-100 pb-6">
+              <div>
+                <h1 className="text-3xl font-extrabold text-safari-900 tracking-tight font-serif italic">My Agency Profile</h1>
+                <p className="text-safari-500 font-medium">Configure copywriting, visuals, and statistics of your safari brand.</p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsProfileOpen(true)}
+                  className="px-5 py-2.5 bg-white border border-safari-200 text-safari-700 hover:bg-safari-55 rounded-lg font-bold text-xs uppercase tracking-widest transition-all shadow-sm flex items-center gap-2"
+                >
+                  <Eye size={14} className="text-safari-500" />
+                  Preview Public Profile
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveBranding}
+                  disabled={isSavingBranding}
+                  className="px-5 py-2.5 bg-safari-900 text-white hover:bg-safari-800 rounded-lg font-black text-xs uppercase tracking-widest transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
+                >
+                  {isSavingBranding ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                  Save All Changes
+                </button>
+              </div>
+            </header>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+              {/* Form panel controls (Left 2 columns) */}
+              <div className="lg:col-span-2 space-y-6">
+                
+                {/* 4 Beautiful Spacious Tabs */}
+                <div className="bg-white rounded-xl shadow-sm border border-safari-100 p-6">
+                  <div className="flex border-b border-safari-100 mb-6 gap-1 pb-0.5 w-full justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setProfileSubTab('general')}
+                      className={`flex-1 min-w-0 justify-center px-1 sm:px-4 py-3.5 font-black text-[9px] sm:text-[11px] uppercase tracking-wider sm:tracking-widest border-b-2 transition-all flex items-center gap-1 sm:gap-2 text-center ${profileSubTab === 'general' ? 'border-safari-900 text-safari-900 bg-safari-50/50 rounded-t-lg' : 'border-transparent text-safari-400 hover:text-safari-600'}`}
+                    >
+                      <Building size={15} className="shrink-0" />
+                      <span className="truncate">Identity & Story</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProfileSubTab('assets')}
+                      className={`flex-1 min-w-0 justify-center px-1 sm:px-4 py-3.5 font-black text-[9px] sm:text-[11px] uppercase tracking-wider sm:tracking-widest border-b-2 transition-all flex items-center gap-1 sm:gap-2 text-center ${profileSubTab === 'assets' ? 'border-safari-900 text-safari-900 bg-safari-50/50 rounded-t-lg' : 'border-transparent text-safari-400 hover:text-safari-600'}`}
+                    >
+                      <Palette size={15} className="shrink-0" />
+                      <span className="truncate">Brand Art</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProfileSubTab('contact')}
+                      className={`flex-1 min-w-0 justify-center px-1 sm:px-4 py-3.5 font-black text-[9px] sm:text-[11px] uppercase tracking-wider sm:tracking-widest border-b-2 transition-all flex items-center gap-1 sm:gap-2 text-center ${profileSubTab === 'contact' ? 'border-safari-900 text-safari-900 bg-safari-50/50 rounded-t-lg' : 'border-transparent text-safari-400 hover:text-safari-600'}`}
+                    >
+                      <Phone size={15} className="shrink-0" />
+                      <span className="truncate">Channels</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProfileSubTab('stats')}
+                      className={`flex-1 min-w-0 justify-center px-1 sm:px-4 py-3.5 font-black text-[9px] sm:text-[11px] uppercase tracking-wider sm:tracking-widest border-b-2 transition-all flex items-center gap-1 sm:gap-2 text-center ${profileSubTab === 'stats' ? 'border-safari-900 text-safari-900 bg-safari-50/50 rounded-t-lg' : 'border-transparent text-safari-400 hover:text-safari-600'}`}
+                    >
+                      <Star size={15} className="shrink-0" />
+                      <span className="truncate">Stats</span>
+                    </button>
+                  </div>
+
+                  {/* TAB CONTENT: General */}
+                  {profileSubTab === 'general' && (
+                    <div className="space-y-6 animate-fadeIn">
+                      {/* Visibility Toggle banner */}
+                      <div className="bg-safari-50/70 border border-safari-100 p-5 rounded-xl space-y-3">
+                        <div className="flex items-start gap-3">
+                          <input 
+                            id="isProfilePublicCheckbox"
+                            type="checkbox"
+                            className="w-5 h-5 rounded accent-safari-900 border-safari-300 focus:ring-safari-500 mt-0.5 cursor-pointer shrink-0 animate-fadeIn"
+                            checked={branding.isProfilePublic !== false}
+                            onChange={(e) => setBranding({...branding, isProfilePublic: e.target.checked})}
+                          />
+                          <div>
+                            <label htmlFor="isProfilePublicCheckbox" className="block text-xs font-black uppercase tracking-wider text-safari-900 cursor-pointer select-none">
+                              Make Profile Visible to the Public
+                            </label>
+                            <p className="text-[11px] text-safari-500 leading-normal font-medium mt-1">
+                              Check this to publish your brand profile page publicly. If unchecked, outside visitors can't see your page, but you can still preview it during configuration.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 pl-8 pt-0.5">
+                          <span className={`w-2.5 h-2.5 rounded-full ${branding.isProfilePublic !== false ? 'bg-green-500 animate-pulse' : 'bg-red-400'}`} />
+                          <span className="text-[10px] font-black uppercase tracking-widest text-safari-600">
+                            Current Status: {branding.isProfilePublic !== false ? 'Publicly Searchable' : 'Private / Disabled'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-400 tracking-widest">Agency Name</label>
+                          <input
+                            type="text"
+                            className="w-full p-3 bg-safari-50 border border-safari-100 rounded-lg font-bold text-safari-900 text-sm outline-none focus:ring-2 focus:ring-safari-500/10 placeholder:text-gray-300"
+                            value={branding.agencyName || company?.name || ''}
+                            onChange={(e) => setBranding({ ...branding, agencyName: e.target.value })}
+                            placeholder="Agency Legal/Trade Name"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-400 tracking-widest">Established Year</label>
+                          <input
+                            type="text"
+                            className="w-full p-3 bg-safari-50 border border-safari-100 rounded-lg font-bold text-safari-900 text-sm outline-none focus:ring-2 focus:ring-safari-500/10 placeholder:text-gray-300"
+                            value={branding.establishedYear || ''}
+                            onChange={(e) => setBranding({ ...branding, establishedYear: e.target.value })}
+                            placeholder="e.g. Founded 2012"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-[10px] font-black uppercase text-safari-400 tracking-widest">Hero Display Headline</label>
+                        <input
+                          type="text"
+                          className="w-full p-3 bg-safari-50 border border-safari-100 rounded-lg font-bold text-safari-900 text-sm outline-none focus:ring-2 focus:ring-safari-500/10 placeholder:text-gray-300"
+                          value={branding.heroTitle || ''}
+                          onChange={(e) => setBranding({ ...branding, heroTitle: e.target.value })}
+                          placeholder="e.g. Crafting Unforgettable African Odysseys."
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-[10px] font-black uppercase text-safari-400 tracking-widest">Hero Sub-Tagline</label>
+                        <textarea
+                          rows={2}
+                          className="w-full p-3 bg-safari-50 border border-safari-105 rounded-lg font-bold text-safari-900 text-sm outline-none focus:ring-2 focus:ring-safari-500/10 placeholder:text-gray-300 resize-none"
+                          value={branding.heroDescription || ''}
+                          onChange={(e) => setBranding({ ...branding, heroDescription: e.target.value })}
+                          placeholder="Introductory tagline displayed over the banner."
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-[10px] font-black uppercase text-safari-400 tracking-widest">About Our Story / Descriptive Summary</label>
+                        <textarea
+                          rows={6}
+                          className="w-full p-3 bg-safari-50 border border-safari-105 rounded-lg font-semibold text-safari-900 text-sm outline-none focus:ring-2 focus:ring-safari-500/10 placeholder:text-gray-300"
+                          value={branding.agencyDescription || ''}
+                          onChange={(e) => setBranding({ ...branding, agencyDescription: e.target.value })}
+                          placeholder="Tell customers about your roots, ethics, team size and conservation alignment."
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB CONTENT: Assets & Theme */}
+                  {profileSubTab === 'assets' && (
+                    <div className="space-y-8 animate-fadeIn">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-2">
+                        {/* Brand Logo */}
+                        <div className="space-y-3">
+                          <label className="block text-[10px] font-black uppercase text-safari-400 tracking-widest">Brand Mark / Logo</label>
+                          <div className="flex items-center gap-4 bg-safari-50/50 p-4 rounded-xl border border-safari-100">
+                            <div className="w-20 h-20 bg-white rounded-lg border border-safari-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                              {branding.agencyLogo ? (
+                                <img src={branding.agencyLogo} alt="Logo" className="w-full h-full object-contain p-1" referrerPolicy="no-referrer" />
+                              ) : (
+                                <Building2 className="text-safari-200" size={32} />
+                              )}
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="px-4 py-2 bg-safari-900 text-white rounded-lg font-black text-[10px] uppercase tracking-wider cursor-pointer hover:bg-safari-800 transition-colors inline-block text-center shadow">
+                                Upload Logo
+                                <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
+                              </label>
+                              {branding.agencyLogo && (
+                                <button
+                                  type="button"
+                                  onClick={() => setBranding({ ...branding, agencyLogo: '' })}
+                                  className="block text-[9px] font-black uppercase text-red-500 hover:text-red-700 transition-colors py-1 pl-1"
+                                >
+                                  Reset Logo
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Cover Landing Image */}
+                        <div className="space-y-3">
+                          <label className="block text-[10px] font-black uppercase text-safari-400 tracking-widest">Hero Cover Photo</label>
+                          <div className="flex items-center gap-4 bg-safari-50/50 p-4 rounded-xl border border-safari-100">
+                            <div className="w-20 h-20 bg-white rounded-lg border border-safari-100 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                              {branding.heroImage ? (
+                                <img src={branding.heroImage} alt="Cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              ) : (
+                                <Map className="text-safari-200" size={32} />
+                              )}
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="px-4 py-2 bg-safari-900 text-white rounded-lg font-black text-[10px] uppercase tracking-wider cursor-pointer hover:bg-safari-800 transition-colors inline-block text-center shadow">
+                                Upload Cover
+                                <input type="file" className="hidden" accept="image/*" onChange={handleHeroImageUpload} />
+                              </label>
+                              {branding.heroImage && (
+                                <button
+                                  type="button"
+                                  onClick={() => setBranding({ ...branding, heroImage: '' })}
+                                  className="block text-[9px] font-black uppercase text-red-500 hover:text-red-700 transition-colors py-1 pl-1"
+                                >
+                                  Reset Cover
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Brand palette config */}
+                      <div className="border-t border-safari-100 pt-6 space-y-4">
+                        <h4 className="text-[11px] font-black uppercase tracking-wider text-safari-800">Theme Colors & Palettes</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2 bg-safari-50/40 p-4 border border-safari-100 rounded-xl">
+                            <label className="block text-[10px] font-black uppercase text-safari-400 tracking-widest">Primary Brand Color</label>
+                            <p className="text-[10px] text-safari-500 mb-2">Used for active labels, primary highlights, and brand badges.</p>
+                            <div className="flex gap-3">
+                              <input
+                                type="color"
+                                className="w-12 h-10 border border-safari-100 rounded cursor-pointer shadow-sm animate-fadeIn"
+                                value={branding.primaryColor || '#8f8664'}
+                                onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
+                              />
+                              <input
+                                type="text"
+                                className="flex-1 p-2 bg-white border border-safari-105 rounded-lg text-xs font-mono font-bold uppercase text-safari-900 outline-none"
+                                value={branding.primaryColor || '#8f8664'}
+                                onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2 bg-safari-50/40 p-4 border border-safari-100 rounded-xl">
+                            <label className="block text-[10px] font-black uppercase text-safari-400 tracking-widest">Secondary Accent Color</label>
+                            <p className="text-[10px] text-safari-500 mb-2">Used for major typography headings on high contrast modules.</p>
+                            <div className="flex gap-3">
+                              <input
+                                type="color"
+                                className="w-12 h-10 border border-safari-100 rounded cursor-pointer shadow-sm animate-fadeIn"
+                                value={branding.secondaryColor || '#413c31'}
+                                onChange={(e) => setBranding({ ...branding, secondaryColor: e.target.value })}
+                              />
+                              <input
+                                type="text"
+                                className="flex-1 p-2 bg-white border border-safari-105 rounded-lg text-xs font-mono font-bold uppercase text-safari-900 outline-none"
+                                value={branding.secondaryColor || '#413c31'}
+                                onChange={(e) => setBranding({ ...branding, secondaryColor: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB CONTENT: Contacts */}
+                  {profileSubTab === 'contact' && (
+                    <div className="space-y-6 animate-fadeIn">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-400 tracking-widest">Contact Email</label>
+                          <input
+                            type="email"
+                            className="w-full p-3 bg-safari-50 border border-safari-100 rounded-lg font-bold text-safari-900 text-sm outline-none"
+                            value={branding.contactEmail || ''}
+                            onChange={(e) => setBranding({ ...branding, contactEmail: e.target.value })}
+                            placeholder="concierge@luxury-africa.com"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-[10px] font-black uppercase text-safari-400 tracking-widest">Direct Phone</label>
+                          <input
+                            type="text"
+                            className="w-full p-3 bg-safari-50 border border-safari-100 rounded-lg font-bold text-safari-900 text-sm outline-none"
+                            value={branding.contactPhone || ''}
+                            onChange={(e) => setBranding({ ...branding, contactPhone: e.target.value })}
+                            placeholder="+254 700 000000"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-[10px] font-black uppercase text-safari-400 tracking-widest">WhatsApp Integration</label>
+                        <p className="text-[10.5px] text-safari-500">Include country code without any spaces or plus formatting signs, e.g. 254700000000</p>
+                        <input
+                          type="text"
+                          className="w-full p-3 bg-safari-50 border border-safari-100 rounded-lg font-bold text-safari-900 text-sm outline-none"
+                          value={branding.whatsappNumber || ''}
+                          onChange={(e) => setBranding({ ...branding, whatsappNumber: e.target.value })}
+                          placeholder="254700000000"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="block text-[10px] font-black uppercase text-safari-400 tracking-widest">Office Address</label>
+                        <textarea
+                          rows={4}
+                          className="w-full p-3 bg-safari-50 border border-safari-102 rounded-lg font-bold text-safari-900 text-sm outline-none resize-none"
+                          value={branding.contactAddress || ''}
+                          onChange={(e) => setBranding({ ...branding, contactAddress: e.target.value })}
+                          placeholder="Karen Office Park, Nairobi, Kenya"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB CONTENT: Stats & Accomplishments */}
+                  {profileSubTab === 'stats' && (
+                    <div className="space-y-6 animate-fadeIn">
+                      <div className="flex justify-between items-center border-b border-safari-50 pb-3">
+                        <div>
+                          <h4 className="text-[11px] font-black uppercase text-safari-800 tracking-wider">Metrics & Achievements</h4>
+                          <p className="text-[10px] text-safari-500">Add up to 4 high-contrast statistics to showcase trust and capabilities.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentStats = branding.statistics || [];
+                            if (currentStats.length >= 4) {
+                              toast.error("Maximum of 4 statistics allowed for aesthetics.");
+                              return;
+                            }
+                            setBranding({
+                              ...branding,
+                              statistics: [...currentStats, { iconType: 'star', value: '100+', label: 'New Metric' }]
+                            });
+                          }}
+                          className="px-3 py-1.5 border border-safari-200 hover:bg-safari-50 text-safari-700 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex items-center gap-1.5"
+                        >
+                          <Plus size={12} /> Add Stat
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                        {((branding.statistics || []) as any[]).map((stat: any, idx: number) => (
+                          <div key={idx} className="p-5 bg-safari-50 rounded-xl border border-safari-100 space-y-3 relative shadow-inner">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = [...(branding.statistics || [])];
+                                updated.splice(idx, 1);
+                                setBranding({ ...branding, statistics: updated });
+                              }}
+                              className="absolute top-3 right-3 text-[10px] font-bold text-red-500 hover:text-red-700 transition-colors bg-white px-2 py-1 rounded border border-red-105"
+                            >
+                              Delete
+                            </button>
+                            
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="space-y-1">
+                                <label className="text-[8px] font-black uppercase text-safari-400">Icon</label>
+                                <select
+                                  value={stat.iconType || 'star'}
+                                  onChange={(e) => {
+                                    const updated = [...(branding.statistics || [])];
+                                    updated[idx] = { ...stat, iconType: e.target.value };
+                                    setBranding({ ...branding, statistics: updated });
+                                  }}
+                                  className="w-full p-1.5 bg-white border border-safari-200 rounded font-black text-xs text-safari-900 outline-none focus:ring-1 focus:ring-safari-900"
+                                >
+                                  <option value="star">Star</option>
+                                  <option value="heart">Heart</option>
+                                  <option value="users">Users</option>
+                                  <option value="shield">Shield</option>
+                                  <option value="award">Award</option>
+                                  <option value="globe">Globe</option>
+                                </select>
+                              </div>
+                              
+                              <div className="space-y-1 col-span-2">
+                                <label className="text-[8px] font-black uppercase text-safari-400">Value</label>
+                                <input
+                                  type="text"
+                                  value={stat.value || ''}
+                                  onChange={(e) => {
+                                    const updated = [...(branding.statistics || [])];
+                                    updated[idx] = { ...stat, value: e.target.value };
+                                    setBranding({ ...branding, statistics: updated });
+                                  }}
+                                  className="w-full p-1.5 bg-white border border-safari-200 rounded font-black text-xs text-safari-900 outline-none animate-fadeIn"
+                                  placeholder="e.g. 10+ Years"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[8px] font-black uppercase text-safari-400">Description Label</label>
+                              <input
+                                type="text"
+                                value={stat.label || ''}
+                                onChange={(e) => {
+                                  const updated = [...(branding.statistics || [])];
+                                  updated[idx] = { ...stat, label: e.target.value };
+                                  setBranding({ ...branding, statistics: updated });
+                                }}
+                                className="w-full p-1.5 bg-white border border-safari-200 rounded font-bold text-xs text-safari-800 outline-none"
+                                placeholder="e.g. In The Wilderness"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        {(branding.statistics || []).length === 0 && (
+                          <div className="p-8 border border-dashed border-safari-100 rounded-xl text-center col-span-2 bg-white flex flex-col items-center justify-center space-y-2">
+                            <Star size={24} className="text-safari-200" />
+                            <p className="text-xs italic text-safari-400">No custom statistics configured yet.</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right panel: Sticky Live Preview Device mockup */}
+              <div className="lg:col-span-1 lg:sticky lg:top-6 space-y-6">
+                
+                {/* 5. Quick Preview Identity Card */}
+                <section className="bg-safari-900 text-white rounded-xl shadow-2xl overflow-hidden border border-black/20">
+                  <div className={`p-2.5 text-center text-[9px] font-black uppercase tracking-widest text-white flex items-center justify-center gap-1.5 transition-all duration-300 ${branding.isProfilePublic !== false ? 'bg-gradient-to-r from-green-600 to-emerald-600 animate-fadeIn' : 'bg-red-900/60 text-red-200 border-b border-red-900/40 animate-fadeIn'}`}>
+                    <span className={`w-2 h-2 rounded-full ${branding.isProfilePublic !== false ? 'bg-green-300 animate-pulse' : 'bg-red-400'}`} />
+                    {branding.isProfilePublic !== false ? '🟢 Publicly Published' : '🔴 Private / Hidden'}
+                  </div>
+
+                  <div className="p-6 space-y-5">
+                    <h4 className="text-[10px] font-black uppercase text-safari-400 tracking-widest">
+                      Live Preview Mockup
+                    </h4>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 border-b border-white/10 pb-4">
+                        <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center overflow-hidden shrink-0 border border-white/5 shadow-sm">
+                          {branding.agencyLogo ? (
+                            <img src={branding.agencyLogo} alt="Logo" className="w-full h-full object-contain p-1" referrerPolicy="no-referrer" />
+                          ) : (
+                            <Building2 className="text-safari-800" size={24} />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h5 className="font-bold text-base truncate text-white" style={{color: branding.primaryColor || '#ffffff'}}>
+                            {branding.agencyName || company?.name || 'My Safari Brand'}
+                          </h5>
+                          <p className="text-[9px] text-safari-300 font-black uppercase tracking-widest">
+                            {branding.establishedYear ? `Established ${branding.establishedYear}` : 'Premium Partner'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="text-[11px] text-white font-serif line-clamp-2 italic leading-tight">
+                          "{branding.heroTitle || 'Crafting Unforgettable African Odysseys.'}"
+                        </p>
+                        <p className="text-[10px] text-safari-300 line-clamp-4 leading-relaxed font-sans font-medium text-white/70">
+                          {branding.heroDescription || 'Introduce your professional identity.'}
+                        </p>
+                      </div>
+
+                      <div className="pt-3 border-t border-white/10 grid grid-cols-1 gap-1.5 text-[10px] font-mono text-safari-300">
+                        <div className="flex items-center gap-2 text-white/50 truncate">
+                          <span>📧</span> {branding.contactEmail || 'Not specified'}
+                        </div>
+                        <div className="flex items-center gap-2 text-white/50 truncate">
+                          <span>📞</span> {branding.contactPhone || 'Not specified'}
+                        </div>
+                        {branding.whatsappNumber && (
+                          <div className="flex items-center gap-2 text-emerald-400 truncate">
+                            <span>💬</span> WhatsApp Connected
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
         )}
 
         {activeTab === 'super_hub' && (
@@ -3112,9 +3599,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         </div>
                         <div className="space-y-2">
                           <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">Client Secret</label>
-                          <input type="password" className="w-full p-3 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
-                            value={branding?.paymentGateways?.paypal?.clientSecret || ''}
-                            onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, paypal: {...branding.paymentGateways?.paypal, clientSecret: e.target.value} as any}})} />
+                          <div className="relative">
+                            <input 
+                              type={showPaypalSecret ? "text" : "password"} 
+                              className="w-full p-3 pr-10 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
+                              value={branding?.paymentGateways?.paypal?.clientSecret || ''}
+                              onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, paypal: {...branding.paymentGateways?.paypal, clientSecret: e.target.value} as any}})} 
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPaypalSecret(!showPaypalSecret)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-safari-400 hover:text-safari-600 transition-colors"
+                            >
+                              {showPaypalSecret ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
                         </div>
                         <div className="space-y-2 md:col-span-2">
                           <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">IPN / Callback URL (For your PayPal Dashboard)</label>
@@ -3154,9 +3653,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         </div>
                         <div className="space-y-2">
                           <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">Consumer Secret</label>
-                          <input type="password" className="w-full p-3 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
-                            value={branding?.paymentGateways?.pesapal?.consumerSecret || ''}
-                            onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, pesapal: {...branding.paymentGateways?.pesapal, consumerSecret: e.target.value} as any}})} />
+                          <div className="relative">
+                            <input 
+                              type={showPesapalSecret ? "text" : "password"} 
+                              className="w-full p-3 pr-10 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
+                              value={branding?.paymentGateways?.pesapal?.consumerSecret || ''}
+                              onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, pesapal: {...branding.paymentGateways?.pesapal, consumerSecret: e.target.value} as any}})} 
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPesapalSecret(!showPesapalSecret)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-safari-400 hover:text-safari-600 transition-colors"
+                            >
+                              {showPesapalSecret ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
                         </div>
                         <div className="space-y-2 md:col-span-2">
                           <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">IPN / Callback URL</label>
@@ -3196,9 +3707,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                         </div>
                         <div className="space-y-2">
                           <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">Secret Key</label>
-                          <input type="password" className="w-full p-3 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
-                            value={branding?.paymentGateways?.stripe?.secretKey || ''}
-                            onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, stripe: {...branding.paymentGateways?.stripe, secretKey: e.target.value} as any}})} />
+                          <div className="relative">
+                            <input 
+                              type={showStripeSecretKey ? "text" : "password"} 
+                              className="w-full p-3 pr-10 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
+                              value={branding?.paymentGateways?.stripe?.secretKey || ''}
+                              onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, stripe: {...branding.paymentGateways?.stripe, secretKey: e.target.value} as any}})} 
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowStripeSecretKey(!showStripeSecretKey)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-safari-400 hover:text-safari-600 transition-colors"
+                            >
+                              {showStripeSecretKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
                         </div>
                         <div className="space-y-2 md:col-span-2">
                           <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest">Webhook Setup (Stripe Dashboard &gt; Webhooks)</label>
@@ -3208,9 +3731,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
                             <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/stripe`); toast.success('Webhook URL copied!'); }} className="p-3 bg-safari-800 text-white rounded-lg hover:bg-safari-900 transition"><Link size={16}/></button>
                           </div>
                           <label className="block text-[10px] font-black uppercase text-safari-500 tracking-widest mb-1 mt-4">Webhook Endpoint Secret</label>
-                          <input type="password" placeholder="whsec_..." className="w-full p-3 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
-                            value={branding?.paymentGateways?.stripe?.webhookSecret || ''}
-                            onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, stripe: {...branding.paymentGateways?.stripe, webhookSecret: e.target.value} as any}})} />
+                          <div className="relative">
+                            <input 
+                              type={showStripeWebhookSecret ? "text" : "password"} 
+                              placeholder="whsec_..." 
+                              className="w-full p-3 pr-10 bg-white border border-safari-200 rounded-lg font-bold text-sm outline-none" 
+                              value={branding?.paymentGateways?.stripe?.webhookSecret || ''}
+                              onChange={(e) => setBranding({...branding, paymentGateways: {...branding.paymentGateways, stripe: {...branding.paymentGateways?.stripe, webhookSecret: e.target.value} as any}})} 
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowStripeWebhookSecret(!showStripeWebhookSecret)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-safari-400 hover:text-safari-600 transition-colors"
+                            >
+                              {showStripeWebhookSecret ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -4662,7 +5198,7 @@ const NavItem = ({ icon, label, isActive, collapsed, onClick }: any) => (
 
 const SummaryCard = ({ title, value, subtitle, icon, trend, positive }: any) => (
   <Tooltip content={`${title}: ${subtitle}`} side="top" align="center">
-    <div className="bg-white p-7 rounded-[2rem] shadow-sm border border-safari-100 relative overflow-hidden group hover:shadow-xl hover:shadow-safari-900/5 transition-all duration-300">
+    <div className="bg-white p-7 rounded-2xl shadow-sm border border-safari-100 relative overflow-hidden group hover:shadow-xl hover:shadow-safari-900/5 transition-all duration-300">
       <div className="flex justify-between items-start mb-4">
         <div className="w-12 h-12 bg-safari-50 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
           {icon || <LayoutDashboard size={22} className="text-safari-600" />}

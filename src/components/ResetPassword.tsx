@@ -1,13 +1,15 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { Lock, CheckCircle2, Loader2, Compass } from 'lucide-react';
+import { Lock, CheckCircle2, Loader2, Compass, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const ResetPassword: React.FC<{ onComplete?: () => void }> = ({ onComplete }) => {
   const { updatePassword } = useAuth();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -80,14 +82,21 @@ const ResetPassword: React.FC<{ onComplete?: () => void }> = ({ onComplete }) =>
                   <div className="relative group">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-safari-400 group-focus-within:text-safari-600 transition-colors" size={18} />
                     <input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
+                      className="w-full pl-12 pr-12 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                       placeholder="••••••••"
                       autoFocus
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-safari-400 hover:text-safari-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
                 </div>
 
@@ -96,13 +105,20 @@ const ResetPassword: React.FC<{ onComplete?: () => void }> = ({ onComplete }) =>
                   <div className="relative group">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-safari-400 group-focus-within:text-safari-600 transition-colors" size={18} />
                     <input
-                      type="password"
+                      type={showConfirmPassword ? "text" : "password"}
                       required
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
+                      className="w-full pl-12 pr-12 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                       placeholder="••••••••"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-safari-400 hover:text-safari-600 transition-colors"
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
                 </div>
 

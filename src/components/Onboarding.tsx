@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Building2, User, Mail, Lock, CheckCircle2, ArrowRight, Loader2, Map } from 'lucide-react';
+import { Building2, User, Mail, Lock, CheckCircle2, ArrowRight, Loader2, Map, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BrandingConfig } from '../types';
 
@@ -38,11 +38,13 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
   const [step, setStep] = useState(1);
   const [isSignUp, setIsSignUp] = useState(initialMode === 'signup');
   const [showPasswordField, setShowPasswordField] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isInvited, setIsInvited] = useState(false);
   const [invitedCompany, setInvitedCompany] = useState<{id: string, name: string} | null>(null);
+  const [showRegisterConfirm, setShowRegisterConfirm] = useState(false);
   
   // Local user state to bridge the gap while AuthContext is updating
   const [localUser, setLocalUser] = useState<any>(null);
@@ -298,12 +300,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
             setError(null);
           }, 800);
         } else {
-          setError("Account not found. Please sign up to create your agency.");
-          setTimeout(() => {
-            setIsSignUp(true);
-            setStep(1);
-            setError(null);
-          }, 800);
+          setError(null);
+          setShowRegisterConfirm(true);
         }
       } catch (err: any) {
         setError(formatAuthError(err));
@@ -554,7 +552,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
               isSignUp ? (
                 step === 1 ? 'Start Your Journey' : 
                 (isInvited ? 'Accept Invitation' : 'Setup your Account')
-              ) : 'Welcome Back'
+              ) : (showRegisterConfirm ? 'Create Account?' : 'Welcome Back')
             ) : view === 'company' ? (
               'Setup Agency Profile'
             ) : view === 'forgot' ? (
@@ -571,7 +569,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                   : isInvited 
                     ? `You've been invited to join ${invitedCompany?.name}.`
                     : regType !== 'user' ? 'Secure your professional management dashboard.' : 'Start your personal safari journey.'
-              ) : 'Log in to manage your professional safari business.'
+              ) : (showRegisterConfirm ? 'This email address is not yet registered on our system.' : 'Log in to manage your professional safari business.')
             ) : view === 'company' ? (
               'Tell us about your company to get started.'
             ) : view === 'forgot' ? (
@@ -748,13 +746,20 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                   <div className="relative group">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-safari-400 group-focus-within:text-safari-600 transition-colors" size={18} />
                     <input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
+                      className="w-full pl-12 pr-12 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                       placeholder="••••••••"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-safari-400 hover:text-safari-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
                 </div>
                 
@@ -784,7 +789,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
               </motion.form>
             )}
 
-            {view === 'auth' && !isSignUp && (
+            {view === 'auth' && !isSignUp && !showRegisterConfirm && (
               <motion.form
                 key="signin-form"
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -840,14 +845,21 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                     <div className="relative group">
                       <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-safari-400 group-focus-within:text-safari-600 transition-colors" size={18} />
                       <input
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
+                        className="w-full pl-12 pr-12 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                         placeholder="••••••••"
                         autoFocus
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-safari-400 hover:text-safari-600 transition-colors"
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
                     </div>
                   </motion.div>
                 )}
@@ -870,6 +882,55 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                   )}
                 </button>
               </motion.form>
+            )}
+
+            {view === 'auth' && !isSignUp && showRegisterConfirm && (
+              <motion.div
+                key="register-confirm"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.05 }}
+                className="space-y-6"
+              >
+                <div className="text-center space-y-2">
+                  <p className="text-xs font-bold text-safari-500 uppercase tracking-widest">
+                    Specified Email Address
+                  </p>
+                  <p className="px-4 py-3 bg-safari-50 text-safari-900 font-mono text-sm font-semibold rounded-lg truncate border border-safari-100">
+                    {email}
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      setIsSignUp(true);
+                      setStep(1);
+                      setShowRegisterConfirm(false);
+                      setSuccess(null);
+                      setError(null);
+                    }}
+                    className="w-full py-4 bg-safari-900 text-white rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-800 transition-all shadow-xl shadow-safari-900/20 flex items-center justify-center gap-3 active:scale-95"
+                  >
+                    <CheckCircle2 size={18} />
+                    Yes, Register New Account
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowRegisterConfirm(false);
+                      setShowPasswordField(false);
+                      setEmail('');
+                      setPassword('');
+                      setSuccess(null);
+                      setError(null);
+                    }}
+                    className="w-full py-4 bg-white border border-safari-200 text-safari-700 rounded-lg font-black uppercase text-xs tracking-[0.2em] hover:bg-safari-50 transition-all flex items-center justify-center gap-3 active:scale-95"
+                  >
+                    Try Another Email
+                  </button>
+                </div>
+              </motion.div>
             )}
 
             {view === 'company' && (
@@ -1012,13 +1073,20 @@ const Onboarding: React.FC<OnboardingProps> = ({ initialMode = 'signup', userTyp
                   <div className="relative group">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-safari-400 group-focus-within:text-safari-600 transition-colors" size={18} />
                     <input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-12 pr-4 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
+                      className="w-full pl-12 pr-12 py-3 bg-white/50 border border-white/60 rounded-lg focus:bg-white focus:ring-2 focus:ring-safari-900/10 outline-none transition-all placeholder:text-safari-300 font-bold text-sm"
                       placeholder="••••••••"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-safari-400 hover:text-safari-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
                 </div>
                 {error && <p className="text-red-600 text-xs font-bold bg-red-50/50 backdrop-blur-md p-4 rounded-lg border border-red-100/50">{error}</p>}

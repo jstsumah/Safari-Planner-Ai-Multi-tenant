@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
+import { useAuth } from '../hooks/useAuth';
 
 interface Review {
   id: string;
@@ -55,7 +56,42 @@ interface Lodge {
   images: string[];
 }
 
+const ReviewItem: React.FC<{ review: Review }> = ({ review }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const MAX_LENGTH = 150;
+  
+  const isLong = review.comment.length > MAX_LENGTH;
+  const displayText = isExpanded ? review.comment : `${review.comment.substring(0, MAX_LENGTH)}...`;
+
+  return (
+    <div className="bg-white p-8 rounded-xl shadow-sm border border-safari-50 space-y-4 relative group hover:shadow-xl transition-all">
+      <div className="absolute -top-4 -right-4 w-12 h-12 bg-safari-50 rounded-xl flex items-center justify-center text-safari-200 group-hover:text-safari-400 group-hover:rotate-12 transition-all">
+        <MessageSquare size={20} />
+      </div>
+      <div className="flex text-amber-500 gap-1">
+        {[...Array(review.rating)].map((_, i) => <Star key={i} fill="currentColor" size={14} />)}
+      </div>
+      <p className="text-safari-700 italic leading-relaxed">
+        "{displayText}"
+        {isLong && (
+          <button 
+            onClick={() => setIsExpanded(!isExpanded)} 
+            className="text-safari-900 font-black ml-2 text-xs uppercase"
+          >
+            {isExpanded ? 'Read less' : 'Read more'}
+          </button>
+        )}
+      </p>
+      <div className="pt-4 border-t border-safari-50 flex justify-between items-center">
+        <p className="font-bold text-safari-900">{review.author_name}</p>
+        <p className="text-[10px] font-black text-safari-300 uppercase">{new Date(review.created_at).toLocaleDateString()}</p>
+      </div>
+    </div>
+  );
+};
+
 const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: defaultBranding, onClose }) => {
+  const { user, profile, company: authCompany } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [lodges, setLodges] = useState<Lodge[]>([]);
@@ -66,6 +102,13 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
 
   // Combine default branding from props with specific company branding
   const branding = companyInfo?.branding || defaultBranding;
+
+  const isAuthorized = !!user && (
+    authCompany?.id === companyInfo?.id || 
+    authCompany?.id === companyId || 
+    authCompany?.slug === companyId || 
+    profile?.is_super_user
+  );
 
   const primaryColor = branding?.primaryColor || '#8f8664';
   const secondaryColor = branding?.secondaryColor || '#413c31';
@@ -216,9 +259,46 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
     }
   };
 
+  if (branding?.isProfilePublic === false && !isAuthorized) {
+    return (
+      <div className="fixed inset-0 bg-safari-50 z-[150] flex flex-col items-center justify-center p-6 text-center animate-fadeIn">
+        <div className="max-w-md w-full bg-white p-10 rounded-2xl border border-safari-100 shadow-2xl space-y-6">
+          <div className="w-16 h-16 bg-safari-50 text-safari-600 rounded-2xl flex items-center justify-center mx-auto border border-safari-100 shadow-inner">
+            <Building2 size={32} />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold font-serif text-safari-900 italic">Profile is Private</h2>
+            <p className="text-sm text-safari-500 font-medium leading-relaxed">
+              This agency profile has been set to private by the administrator and is not publicly visible at this time.
+            </p>
+          </div>
+          <div className="pt-4 border-t border-safari-50">
+            <button 
+              onClick={onClose}
+              className="w-full py-3 bg-safari-900 text-white rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-safari-800 transition-all shadow-md"
+            >
+              Go Back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 bg-safari-100/80 backdrop-blur-md z-[150] overflow-y-auto animate-fadeIn">
+    <div className="fixed inset-0 bg-safari-100/80 backdrop-blur-md z-[150] overflow-y-auto animate-fadeIn col-span-1 border">
       <div className="max-w-6xl mx-auto px-4 py-12 space-y-16">
+        {branding?.isProfilePublic === false && isAuthorized && (
+          <div className="bg-amber-500/10 border border-amber-500/30 text-amber-800 px-6 py-4 rounded-xl flex items-center justify-between gap-4 animate-fadeIn">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🔒</span>
+              <div>
+                <p className="font-extrabold text-xs uppercase tracking-wider text-amber-950">Private Profile Preview</p>
+                <p className="text-[11px] text-amber-800/80 font-medium">This profile is currently hidden from the public. You can view this because you are logged in.</p>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Header Navigation */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -572,19 +652,7 @@ const CompanyProfile: React.FC<CompanyProfileProps> = ({ companyId, branding: de
 
             {/* Review Cards */}
             {reviews.map((review) => (
-              <div key={review.id} className="bg-white p-8 rounded-xl shadow-sm border border-safari-50 space-y-4 relative group hover:shadow-xl transition-all">
-                <div className="absolute -top-4 -right-4 w-12 h-12 bg-safari-50 rounded-xl flex items-center justify-center text-safari-200 group-hover:text-safari-400 group-hover:rotate-12 transition-all">
-                  <MessageSquare size={20} />
-                </div>
-                <div className="flex text-amber-500 gap-1">
-                  {[...Array(review.rating)].map((_, i) => <Star key={i} fill="currentColor" size={14} />)}
-                </div>
-                <p className="text-safari-700 italic leading-relaxed">"{review.comment}"</p>
-                <div className="pt-4 border-t border-safari-50 flex justify-between items-center">
-                  <p className="font-bold text-safari-900">{review.author_name}</p>
-                  <p className="text-[10px] font-black text-safari-300 uppercase">{new Date(review.created_at).toLocaleDateString()}</p>
-                </div>
-              </div>
+              <ReviewItem key={review.id} review={review} />
             ))}
           </div>
         </section>
