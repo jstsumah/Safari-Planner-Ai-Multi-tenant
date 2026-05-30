@@ -1,0 +1,76 @@
+
+<!DOCTYPE html>
+<html lang="en" style="scroll-behavior: smooth;">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1E293B" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SafariPlanner.ai | Custom African Safari Itineraries</title>
+    <meta name="description" content="Design your dream African safari with AI-powered precision. Get instant itineraries, real-time lodge pricing, and expert travel planning." />
+    <meta property="og:title" content="SafariPlanner.ai | Custom African Safari Itineraries" />
+    <meta property="og:description" content="Design your dream African safari with AI-powered precision. Get instant itineraries and real-time lodge pricing." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Montserrat:wght@400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700;1,800;1,900&family=Poppins:wght@400;500;600;700;800;900&family=Roboto:wght@400;500;700;900&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Merriweather:wght@400;700;900&family=Cormorant+Garamond:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Fira+Code:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+      // Global process polyfill
+      window.process = window.process || { env: {} };
+      
+      // Safety shim for window.fetch to prevent "Cannot set property fetch of #<Window> which has only a getter"
+      (function() {
+        var originalFetch = window.fetch;
+        var currentFetch = originalFetch;
+
+        function applyShim(target, name) {
+          try {
+            var descriptor = Object.getOwnPropertyDescriptor(target, name);
+            if (descriptor && descriptor.configurable) {
+              Object.defineProperty(target, name, {
+                get: function() { return currentFetch; },
+                set: function(v) { 
+                  console.warn('Redirected assignment to read-only ' + name);
+                  currentFetch = v;
+                },
+                configurable: true,
+                enumerable: true
+              });
+              return true;
+            }
+          } catch (e) {
+            console.warn('Failed to apply shim to ' + name + ':', e);
+          }
+          return false;
+        }
+
+        // Try applying to window first, then Window.prototype
+        if (!applyShim(window, 'fetch')) {
+          applyShim(Window.prototype, 'fetch');
+        }
+
+        // Also global JSON.parse safety for "undefined"
+        var originalParse = JSON.parse;
+        JSON.parse = function(text, reviver) {
+          if (text === "undefined" || text === undefined) {
+            console.warn('JSON.parse called with "undefined". Returning null to prevent crash. Stack:', new Error().stack);
+            return null;
+          }
+          try {
+            return originalParse.apply(JSON, arguments);
+          } catch (e) {
+            console.error('JSON.parse failed for:', text, 'Error:', e, 'Stack:', new Error().stack);
+            throw e;
+          }
+        };
+      })();
+    </script>
+  </head>
+  <body class="bg-safari-50 text-safari-900 antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/index.tsx"></script>
+  </body>
+</html>
