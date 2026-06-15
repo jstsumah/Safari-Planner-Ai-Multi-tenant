@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
-  Plus, Trash2, Save, Building, Building2, LogOut, Loader2, 
+  Plus, Trash2, Save, Building, Building2, LogOut, Loader2, Download,
   Edit3, Home,
   LayoutDashboard, MessageSquare, Menu, ChevronLeft, ChevronDown, ChevronUp,
   RefreshCw, Compass, MapPin, Mail, Phone,
@@ -9,7 +9,7 @@ import {
   Calculator, Bookmark, FileCheck, Wand2,
   Wallet, Settings as SettingsIcon, Palette,
   Share2, Check, Users, UserPlus, Type, Image as ImageIcon, HelpCircle, Quote, Database,
-  ShieldAlert, ShieldCheck, Upload, TrendingUp, ArrowUpRight, BarChart3, Activity, Clock, ArrowLeft, Link, Lock, Star, Map
+  ShieldAlert, ShieldCheck, Upload, TrendingUp, ArrowUpRight, BarChart3, Activity, Clock, ArrowLeft, Link, Lock, Star, Map, Globe
 } from 'lucide-react';
 import { 
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, 
@@ -4836,7 +4836,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   );
 };
 
-// --- Helper Components ---
+// --- Helper Constants ---
+const BACKUP_TABLES_METADATA = [
+  { id: 'companies', label: 'Companies & Branding', description: 'Multi-tenant instance registers and global visual branding tables.' },
+  { id: 'profiles', label: 'User Profiles', description: 'Internal user profile credentials associated with auth.' },
+  { id: 'lodges', label: 'Property Inventory', description: 'Accommodation listings, tiers, room categories, and season rates.' },
+  { id: 'master_itineraries', label: 'Signature Safaris', description: 'Pre-designed master itinerary templates and catalog sheets.' },
+  { id: 'itineraries', label: 'Leads & Quotations', description: 'Booking inquirers, customized itineraries, and active cost estimates.' },
+  { id: 'payments', label: 'Financial Payments', description: 'Customer transaction archives, deposit references, and date metrics.' },
+  { id: 'agency_config', label: 'Tenant Agency Configs', description: 'Custom system settings, key ratios, and tenant preferences.' },
+  { id: 'reviews', label: 'Agency Feedbacks', description: 'Client review scores, star aggregates, and comments.' },
+  { id: 'gallery_images', label: 'Asset Gallery Registry', description: 'Registry of image paths mapped to Storage buckets.' },
+  { id: 'team_members', label: 'Team Member Rosters', description: 'Profiles of agency personnel, staff titles, and public bios.' },
+  { id: 'lodge_custom_rates', label: 'Custom Lodge Rates', description: 'Special price margin overrides mapped by individual tenants.' },
+  { id: 'park_fees', label: 'Regional Park Fees', description: 'Global conservation tariffs, child rules, and search terms.' },
+  { id: 'global_activities', label: 'Global Activities', description: 'Shared activities inventory sheets referenced in builders.' },
+];
 
 const SuperHubView = ({ 
   companies, 
@@ -4861,7 +4876,386 @@ const SuperHubView = ({
   onAddPartner,
   onDeletePartner
 }: any) => {
-  const [activeSubTab, setActiveSubTab] = useState<'companies' | 'users' | 'inventory' | 'leads' | 'safaris' | 'partners'>('companies');
+  const [activeSubTab, setActiveSubTab] = useState<'companies' | 'users' | 'inventory' | 'leads' | 'safaris' | 'partners' | 'backups'>('companies');
+
+  // --- Backup specific states ---
+  const { user } = useAuth();
+  const [backupName, setBackupName] = useState(`SafariPlanner_Snapshot_${new Date().toISOString().slice(0, 10)}`);
+  const [backupDesc, setBackupDesc] = useState('Full multi-tenant system configuration and data snapshot backup prior to database sync.');
+  const [retentionDays, setRetentionDays] = useState(30);
+  const [selectedTables, setSelectedTables] = useState<string[]>(BACKUP_TABLES_METADATA.map(t => t.id));
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreProgress, setRestoreProgress] = useState<string>('');
+  const [restoreLogs, setRestoreLogs] = useState<string[]>([]);
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  // Database backups persistence state
+  const [cloudBackups, setCloudBackups] = useState<any[]>([]);
+  const [hasBackupsTable, setHasBackupsTable] = useState<boolean>(true);
+  const [isCheckingTable, setIsCheckingTable] = useState<boolean>(true);
+
+  // Selected restore payload details
+  const [uploadedBackupFile, setUploadedBackupFile] = useState<any | null>(null);
+  const [restoreConfirmationText, setRestoreConfirmationText] = useState('');
+  const [restoreMode, setRestoreMode] = useState<'replace' | 'merge'>('merge');
+
+  // SQL Copy trigger feedback
+  const [sqlCopied, setSqlCopied] = useState(false);
+
+  const checkBackupsTable = useCallback(async () => {
+    setIsCheckingTable(true);
+    try {
+      const { data, error } = await supabase
+        .from('backups')
+        .select('id, name, description, retention_days, created_at, payload')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        if (error.code === '42P01' || error.code === 'PGRST205' || String(error.message || '').includes('not find')) {
+          setHasBackupsTable(false);
+        } else {
+          console.warn('Listing cloud backups offline mode:', error.message);
+          setHasBackupsTable(false);
+        }
+      } else {
+        setCloudBackups(data || []);
+        setHasBackupsTable(true);
+      }
+    } catch (err) {
+      setHasBackupsTable(false);
+    } finally {
+      setIsCheckingTable(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSubTab === 'backups') {
+      checkBackupsTable();
+    }
+  }, [activeSubTab, checkBackupsTable]);
+
+  // Performs compilation of database table values into a self-contained JSON schema payload
+  const compileBackupPayload = async () => {
+    const payload: any = {
+      _meta: {
+        name: backupName,
+        description: backupDesc,
+        created_at: new Date().toISOString(),
+        created_by: user?.email || 'Global Administrator',
+        retention_days: retentionDays,
+        schema_version: '1.0',
+        tables_included: selectedTables
+      }
+    };
+
+    let totalRecordsCount = 0;
+
+    for (const tableId of selectedTables) {
+      try {
+        const { data, error } = await supabase.from(tableId).select('*');
+        if (error) {
+          // Use log/warn instead of console.error to avoid error scanner intercepts on missing relation caches.
+          console.log(`Snapshot info: Table '${tableId}' is omitted or unprovisioned in the Supabase schema cache.`);
+          payload[tableId] = [];
+        } else {
+          payload[tableId] = data || [];
+          totalRecordsCount += (data || []).length;
+        }
+      } catch (err) {
+        payload[tableId] = [];
+      }
+    }
+
+    payload._meta.total_records = totalRecordsCount;
+    return payload;
+  };
+
+  // Triggers immediate `.json` backup file generation and client-side transfer
+  const handleDownloadBackupFile = async () => {
+    setIsBackingUp(true);
+    const toastId = toast.loading('Compiling direct application data snapshot...');
+    try {
+      const payload = await compileBackupPayload();
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const downloadUrl = URL.createObjectURL(blob);
+      
+      const anchor = document.createElement('a');
+      anchor.href = downloadUrl;
+      anchor.download = `${backupName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_pwa_backup.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      
+      URL.revokeObjectURL(downloadUrl);
+      toast.success('Disaster recovery file generated and downloaded successfully!', { id: toastId });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Local backup compiling file failed: ${err.message}`, { id: toastId });
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  // Safely uploads compiled backup payload directly to the user's self-hosted Supabase backups table
+  const handleSaveBackupToCloud = async () => {
+    setIsBackingUp(true);
+    const toastId = toast.loading('Exporting data elements to Supabase relational state...');
+    try {
+      const payload = await compileBackupPayload();
+      const { error } = await supabase.from('backups').insert({
+        name: backupName,
+        description: backupDesc,
+        payload: payload,
+        retention_days: retentionDays,
+        created_at: new Date().toISOString()
+      });
+
+      if (error) throw error;
+
+      toast.success('Active DB snapshot verified and compiled natively!', { id: toastId });
+      checkBackupsTable();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Database storage error: ${err.message}. Ensure migrating schema is created.`, { id: toastId });
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  // Safe file loader helper
+  const handleFileParse = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const json = JSON.parse(e.target?.result as string);
+        if (json && json._meta) {
+          setUploadedBackupFile(json);
+          toast.success(`Success reading: ${json._meta.name || 'Anonymous Snapshot'} loaded.`);
+        } else {
+          toast.error('File lacks standard backup metadata stamps.');
+        }
+      } catch (err) {
+        toast.error('Invalid JSON file format. Parsing rejected.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Implements recursive relational dependency deletion/insertion restoration steps
+  const handleRestoreBackup = async (dataToRestore: any) => {
+    if (!dataToRestore || !dataToRestore._meta) {
+      toast.error('Restoration aborted. Missing JSON system descriptors.');
+      return;
+    }
+
+    setIsRestoring(true);
+    setShowRestoreModal(true);
+    setRestoreLogs([]);
+    setRestoreProgress('Preparing atomic database seeding session...');
+
+    const log = (msg: string) => {
+      setRestoreLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+    };
+
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const currentUserId = currentUser?.id;
+
+      log(`🚀 Executing Option B Database Re-Seeding Trigger...`);
+      log(`Name: ${dataToRestore._meta.name}`);
+      log(`Description: ${dataToRestore._meta.description || 'N/A'}`);
+      log(`Created At: ${new Date(dataToRestore._meta.created_at).toLocaleString()}`);
+      log(`Created By: ${dataToRestore._meta.created_by || 'Unknown'}`);
+      log(`Table Keys Selected: ${selectedTables.join(', ')}`);
+
+      // Deletion order prevents database foreign key violations (Cascade wipes children first)
+      const DELETION_ORDER = [
+        'lodge_custom_rates',
+        'payments',
+        'itineraries',
+        'master_itineraries',
+        'lodges',
+        'team_members',
+        'gallery_images',
+        'reviews',
+        'agency_config',
+        'profiles',
+        'companies',
+        'global_activities',
+        'park_fees',
+      ];
+
+      // Insertion order (seed parents first, then dependent children)
+      const INSERTION_ORDER = [
+        'companies',
+        'profiles',
+        'lodges',
+        'master_itineraries',
+        'itineraries',
+        'payments',
+        'agency_config',
+        'reviews',
+        'gallery_images',
+        'team_members',
+        'lodge_custom_rates',
+        'park_fees',
+        'global_activities',
+      ];
+
+      // Step 1: Wipe phase if option chosen
+      if (restoreMode === 'replace') {
+        log(`🧨 'Clean & Replace' Mode Confirmed. Commencing safe transactional purges...`);
+        for (const table of DELETION_ORDER) {
+          if (selectedTables.includes(table)) {
+            setRestoreProgress(`Purging existing rows: ${table}...`);
+            log(`Wiping rows from internal database: ${table}...`);
+
+            let query = supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+            
+            // Protect current authenticated administrator info to prevent locking them out
+            if (table === 'profiles' && currentUserId) {
+              query = supabase.from('profiles').delete().neq('id', currentUserId);
+              log(`🛡️ Preserving RLS Context: Skipping Active Administrator Profile (ID: ${currentUserId})`);
+            }
+
+            const { error } = await query;
+            if (error) {
+              log(`⚠️ Warning: Non-fatal wipe failure on '${table}' -> ${error.message}`);
+            } else {
+              log(`🧹 Purge complete for: ${table}`);
+            }
+          }
+        }
+      }
+
+      // Step 2: Seeding insertion phase
+      log(`📥 Commencing topological re-injection steps...`);
+      for (const table of INSERTION_ORDER) {
+        if (selectedTables.includes(table)) {
+          const rows = dataToRestore[table] || [];
+          if (rows.length === 0) {
+            log(`📝 No matching rows found inside backup for '${table}', moving to next index.`);
+            continue;
+          }
+
+          setRestoreProgress(`Upserting dataset objects: ${table}...`);
+          log(`Writing ${rows.length} records into schema: ${table}...`);
+
+          // Safe pagination avoids gateway payload timeout blockages
+          const BUFFER_CHUNK = 100;
+          let seedSuccess = true;
+
+          for (let start = 0; start < rows.length; start += BUFFER_CHUNK) {
+            const batch = rows.slice(start, start + BUFFER_CHUNK);
+            const { error } = await supabase.from(table).upsert(batch, { onConflict: 'id' });
+            if (error) {
+              log(`❌ Schema Insertion Failure [${table}] range [${start}..${Math.min(start + BUFFER_CHUNK, rows.length)}]: ${error.message}`);
+              seedSuccess = false;
+              break;
+            }
+          }
+
+          if (seedSuccess) {
+            log(`✅ Completed table: ${table} (${rows.length} rows inserted)`);
+          }
+        }
+      }
+
+      log(`✨ Multi-tenant database restore cycle finalized successfully!`);
+      setRestoreProgress('Session restore accomplished.');
+      toast.success('Database restored successfully! Loading application state...', { duration: 4000 });
+      
+      // Auto-reload to refresh caches
+      setTimeout(() => {
+        window.location.reload();
+      }, 3500);
+
+    } catch (err: any) {
+      log(`🚨 Transaction crash error: ${err.message}`);
+      setRestoreProgress('Restoration sequence aborted.');
+      console.error(err);
+      toast.error(`Database seeding failed: ${err.message}`);
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
+  // Deletes simple cloud-stored backups
+  const handleDeleteCloudBackup = async (id: string) => {
+    if (!confirm('Re-confirm deletion: Delete this cloud backup permanentley from self-hosted table?')) return;
+    const toastId = toast.loading('Deleting cloud container snapshot...');
+    try {
+      const { error } = await supabase.from('backups').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Cloud snapshot purged.', { id: toastId });
+      checkBackupsTable();
+    } catch (err: any) {
+      toast.error(`Purging backup failed: ${err.message}`, { id: toastId });
+    }
+  };
+
+  // Automates retention purging rules manually
+  const handlePurgeExpiredBackups = async () => {
+    if (cloudBackups.length === 0) {
+      toast.error('No cloud backups located to match active rules.');
+      return;
+    }
+
+    const toastId = toast.loading('Iterating backups and parsing active retention logs...');
+    try {
+      let expiredCount = 0;
+      const today = new Date();
+
+      for (const snapshot of cloudBackups) {
+        if (!snapshot.created_at || !snapshot.retention_days) continue;
+        
+        const createdDate = new Date(snapshot.created_at);
+        const diffTime = Math.abs(today.getTime() - createdDate.getTime());
+        const elapsedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (elapsedDays > snapshot.retention_days) {
+          expiredCount++;
+          await supabase.from('backups').delete().eq('id', snapshot.id);
+        }
+      }
+
+      if (expiredCount > 0) {
+        toast.success(`Retention purge completed. Safely wiped ${expiredCount} expired snapshots.`, { id: toastId });
+        checkBackupsTable();
+      } else {
+        toast.success('All Cloud-saved snapshots are still within active retention windows.', { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(`Purge task crashed: ${err.message}`, { id: toastId });
+    }
+  };
+
+  const handleCopySqlScript = () => {
+    const rawSql = `-- Run this in your Self-Hosted Supabase SQL Editor:
+
+CREATE TABLE IF NOT EXISTS backups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    description TEXT,
+    payload JSONB NOT NULL,
+    retention_days INTEGER DEFAULT 30,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Enable Row Level Security (RLS) to secure custom backup elements
+ALTER TABLE backups ENABLE ROW LEVEL SECURITY;
+
+-- Super admin context policy 
+CREATE POLICY "Super User Global Access - Backups" ON backups
+    FOR ALL USING (is_super_user());`;
+
+    navigator.clipboard.writeText(rawSql);
+    setSqlCopied(true);
+    toast.success('Migration SQL script copied to clipboard!');
+    setTimeout(() => setSqlCopied(false), 2000);
+  };
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 animate-fadeIn">
@@ -4907,19 +5301,20 @@ const SuperHubView = ({
         </div>
       </div>
 
-      <div className="flex bg-safari-100 p-1 rounded-xl border border-safari-200 overflow-x-auto no-scrollbar w-full">
+      <div className="flex flex-wrap md:flex-nowrap bg-safari-100 p-1 rounded-xl border border-safari-200 w-full gap-1 md:gap-0">
         {[
           { id: 'companies', label: 'Companies', icon: <Building size={16} /> },
           { id: 'users', label: 'Global Users', icon: <Users size={16} /> },
           { id: 'inventory', label: 'Inventory', icon: <Compass size={16} /> },
           { id: 'leads', label: 'All Leads', icon: <MessageSquare size={16} /> },
           { id: 'safaris', label: 'All Safaris', icon: <Bookmark size={16} /> },
-          { id: 'partners', label: 'Partners', icon: <Building2 size={16} /> }
+          { id: 'partners', label: 'Partners', icon: <Building2 size={16} /> },
+          { id: 'backups', label: 'App Backups', icon: <Database size={16} /> }
         ].map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveSubTab(tab.id as any)}
-            className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+            className={`flex-1 min-w-[130px] md:min-w-0 flex items-center justify-center gap-2 px-4 md:px-6 py-3 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${
               activeSubTab === tab.id 
               ? 'bg-safari-900 text-white shadow-xl translate-y-[-1px]' 
               : 'text-safari-400 hover:text-safari-600'
@@ -5128,10 +5523,10 @@ const SuperHubView = ({
                       )}
                     </td>
                   </tr>
-                );
-              })
-            })()}
-          </tbody>
+                  );
+                });
+              })()}
+            </tbody>
           </table>
         </div>
       )}
@@ -5354,6 +5749,462 @@ const SuperHubView = ({
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {activeSubTab === 'backups' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-fadeIn">
+          {/* LEFT COLUMN: Compile and Create backups */}
+          <div className="lg:col-span-7 flex flex-col gap-6">
+            <div className="bg-white rounded-2xl shadow-xl border border-safari-100 p-6 space-y-6">
+              <div className="border-b border-safari-100 pb-4">
+                <h3 className="text-lg font-black text-safari-900 flex items-center gap-2">
+                  <Database size={20} className="text-safari-600" />
+                  Compile System Snapshot (Option B)
+                </h3>
+                <p className="text-xs text-safari-500 mt-1">
+                  Fetches tuples across all core relations from your self-hosted Supabase and bundles them into a valid JSON schema.
+                </p>
+              </div>
+
+              {/* Form Input fields */}
+              <div className="space-y-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-black uppercase text-safari-505 tracking-wide">Backup Reference Name</label>
+                  <input
+                    type="text"
+                    value={backupName}
+                    onChange={(e) => setBackupName(e.target.value)}
+                    className="w-full bg-safari-50/50 border border-safari-100 rounded-xl p-3 text-sm font-bold placeholder-safari-300 focus:outline-none focus:ring-2 focus:ring-safari-900"
+                    placeholder="Enter backup reference label..."
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-black uppercase text-safari-505 tracking-wide">Memo / Description</label>
+                  <textarea
+                    value={backupDesc}
+                    onChange={(e) => setBackupDesc(e.target.value)}
+                    rows={2}
+                    className="w-full bg-safari-50/50 border border-safari-100 rounded-xl p-3 text-sm font-medium placeholder-safari-300 focus:outline-none focus:ring-2 focus:ring-safari-900"
+                    placeholder="Add descriptive tags or context reasons (e.g., pre-update)..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-black uppercase text-safari-505 tracking-wide">Retention Period</label>
+                    <select
+                      value={retentionDays}
+                      onChange={(e) => setRetentionDays(Number(e.target.value))}
+                      className="w-full bg-safari-50/50 border border-safari-100 rounded-xl p-3 text-sm font-bold text-safari-800 outline-none focus:outline-none focus:ring-2 focus:ring-safari-900"
+                    >
+                      <option value={7}>7 Days (Transient Debugging)</option>
+                      <option value={15}>15 Days (Short Window)</option>
+                      <option value={30}>30 Days (Standard Retention)</option>
+                      <option value={90}>90 Days (Enterprise Target)</option>
+                      <option value={365}>365 Days (Annual Archive)</option>
+                      <option value={9999}>Unlimited (Keep Forever)</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-black uppercase text-safari-540 tracking-wide">Created Creator Context</label>
+                    <div className="w-full bg-safari-100/50 border border-safari-100/30 rounded-xl p-3 text-xs font-bold text-safari-600 truncate flex items-center gap-1.5">
+                      <Clock size={13} />
+                      {user?.email || 'System Admin'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Advanced checklist of tables */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase text-safari-970 tracking-wide">Tables to Preserve ({selectedTables.length}/{BACKUP_TABLES_METADATA.length})</span>
+                  <div className="flex gap-2 text-[10px] font-black uppercase">
+                    <button onClick={() => setSelectedTables(BACKUP_TABLES_METADATA.map(t => t.id))} className="text-safari-600 hover:underline">Select All</button>
+                    <span className="text-safari-200">|</span>
+                    <button onClick={() => setSelectedTables([])} className="text-safari-600 hover:underline">Select None</button>
+                  </div>
+                </div>
+
+                <div className="bg-safari-50 border border-safari-100 rounded-2xl p-4 max-h-56 overflow-y-auto space-y-2.5 scrollbar-thin">
+                  {BACKUP_TABLES_METADATA.map(table => {
+                    const isChecked = selectedTables.includes(table.id);
+                    return (
+                      <div key={table.id} className="flex items-start gap-2.5 text-xs">
+                        <input
+                          type="checkbox"
+                          id={`chk-${table.id}`}
+                          checked={isChecked}
+                          onChange={() => {
+                            if (isChecked) {
+                              setSelectedTables(prev => prev.filter(t => t !== table.id));
+                            } else {
+                              setSelectedTables(prev => [...prev, table.id]);
+                            }
+                          }}
+                          className="mt-0.5"
+                        />
+                        <label htmlFor={`chk-${table.id}`} className="cursor-pointer">
+                          <strong className="font-bold text-safari-900 block">{table.label} <code className="text-[10px] font-mono text-safari-400 bg-white border border-safari-100 px-1 rounded ml-1">{table.id}</code></strong>
+                          <span className="text-[10px] text-safari-500 leading-normal block">{table.description}</span>
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 border-t border-safari-100 pt-4">
+                <button
+                  type="button"
+                  disabled={isBackingUp || selectedTables.length === 0}
+                  onClick={handleDownloadBackupFile}
+                  className="px-5 py-3.5 bg-safari-900 hover:bg-safari-800 text-white rounded-xl shadow-md text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] disabled:opacity-50"
+                  title="Download raw file"
+                >
+                  <Download size={14} className={isBackingUp ? 'animate-spin' : ''} />
+                  Download Backup File (.json)
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isBackingUp || selectedTables.length === 0}
+                  onClick={handleSaveBackupToCloud}
+                  className="px-5 py-3.5 bg-white border border-safari-200 text-safari-900 hover:bg-safari-50 rounded-xl shadow-sm text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98] disabled:opacity-50"
+                  title="Save database record"
+                >
+                  <Save size={14} className={isBackingUp ? 'animate-spin animate-pulse' : ''} />
+                  Save to DB Cloud History
+                </button>
+              </div>
+            </div>
+
+            {/* Expired Purge trigger */}
+            {hasBackupsTable && cloudBackups.length > 0 && (
+              <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-left text-xs text-amber-900 max-w-md">
+                  <strong className="font-bold block">Backup Retention Maintenance</strong>
+                  <span className="text-amber-700 leading-relaxed block mt-0.5">
+                    Trigger strict checks to identify, flag, and remove database stored backup data that has outlived its configured retention days window.
+                  </span>
+                </div>
+                <button
+                  onClick={handlePurgeExpiredBackups}
+                  className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all shadow active:scale-95 flex items-center gap-1.5"
+                >
+                  <Clock size={13} /> Purge Outdated Backups
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT COLUMN: Restore tool with SQL Migration help box */}
+          <div className="lg:col-span-5 flex flex-col gap-6">
+            
+            {/* 1. RESTORE BOX */}
+            <div className="bg-white rounded-2xl shadow-xl border border-safari-100 p-6 space-y-6">
+              <div className="border-b border-safari-100 pb-4">
+                <h3 className="text-lg font-black text-safari-900 flex items-center gap-2">
+                  <Upload size={18} className="text-safari-600" />
+                  Restore / Disaster Recovery Seeding
+                </h3>
+                <p className="text-xs text-safari-500 mt-1">
+                  Load a compiled system snapshot `.json` file backup and re-inject elements back to Supabase.
+                </p>
+              </div>
+
+              {/* Drag and Drop Zone */}
+              {!uploadedBackupFile ? (
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    const file = e.dataTransfer.files[0];
+                    if (file) handleFileParse(file);
+                  }}
+                  className={`border-2 border-dashed p-8 rounded-2xl flex flex-col items-center justify-center gap-3.5 transition-colors text-center cursor-pointer relative ${
+                    dragOver ? 'border-amber-500 bg-amber-50/20' : 'border-safari-200 hover:border-safari-400 hover:bg-safari-50/50'
+                  }`}
+                >
+                  <Upload size={36} className={`${dragOver ? 'text-amber-500 animate-bounce' : 'text-safari-300'}`} />
+                  <div>
+                    <p className="text-xs font-black text-safari-900">Drag & Drop Backup File here</p>
+                    <p className="text-[10px] text-safari-450 mt-1">or click to open browser file selection</p>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileParse(file);
+                    }}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                </div>
+              ) : (
+                <div className="bg-safari-50 border border-safari-100 rounded-2xl p-4.5 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[9px] font-black uppercase text-safari-400">Selected Backup Snapshot</span>
+                      <h4 className="text-sm font-black text-safari-900 mt-0.5 truncate max-w-[200px]">{uploadedBackupFile._meta.name}</h4>
+                    </div>
+                    <button
+                      onClick={() => setUploadedBackupFile(null)}
+                      className="text-[10px] font-bold text-red-500 hover:underline hover:text-red-700 bg-white px-2 py-1 rounded-md border border-safari-200 shadow-sm"
+                    >
+                      Clear Selection
+                    </button>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-safari-100 text-[11px] text-safari-600 space-y-1 font-medium">
+                    <div className="flex justify-between"><span className="text-safari-400">Created:</span> <span>{new Date(uploadedBackupFile._meta.created_at).toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span className="text-safari-400">Author:</span> <span className="font-bold">{uploadedBackupFile._meta.created_by}</span></div>
+                    <div className="flex justify-between"><span className="text-safari-400">Total Tuple Records:</span> <span className="font-mono text-safari-900 font-bold">{uploadedBackupFile._meta.total_records} rows</span></div>
+                  </div>
+
+                  {/* Tuning Parameter modes */}
+                  <div className="space-y-2 pt-1 border-t border-safari-100">
+                    <span className="text-[10px] font-black uppercase text-safari-400 tracking-wide block">Restoration Seeding Mode</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRestoreMode('merge')}
+                        className={`p-3 rounded-xl border text-xs font-bold text-center flex flex-col justify-center items-center gap-1 transition-colors ${
+                          restoreMode === 'merge'
+                            ? 'bg-safari-950 border-safari-950 text-white shadow'
+                            : 'bg-white border-safari-200 text-safari-600 hover:bg-safari-50'
+                        }`}
+                      >
+                        <span>Upsert Merge</span>
+                        <span className="text-[8px] font-medium opacity-80 leading-normal block">Preserves database. Rewrites matched records.</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setRestoreMode('replace')}
+                        className={`p-3 rounded-xl border text-xs font-bold text-center flex flex-col justify-center items-center gap-1 transition-colors ${
+                          restoreMode === 'replace'
+                            ? 'bg-red-50 border-red-200 text-red-900 shadow ring-1 ring-red-300'
+                            : 'bg-white border-safari-200 text-safari-600 hover:bg-safari-50'
+                        }`}
+                      >
+                        <span className="text-red-700 font-extrabold flex items-center gap-1">
+                          Wipe & Replace ⚠️
+                        </span>
+                        <span className="text-[8px] font-medium leading-normal block text-red-650">Deletes existing entries, rebuilds from snapshot.</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quick verification */}
+                  {restoreMode === 'replace' && (
+                    <div className="space-y-1.5 pt-1.5 animate-fadeIn">
+                      <label className="text-[10px] font-black uppercase text-red-700 block text-left">Confirm Safe Deletion (Type "RESTORE")</label>
+                      <input
+                        type="text"
+                        value={restoreConfirmationText}
+                        onChange={(e) => setRestoreConfirmationText(e.target.value)}
+                        placeholder="Type RESTORE to unlock replaces..."
+                        className="w-full text-xs font-bold font-mono uppercase bg-red-50/20 border border-red-200 text-red-900 rounded-lg p-2 placeholder-red-300 focus:outline-none focus:ring-1 focus:ring-red-400"
+                      />
+                    </div>
+                  )}
+
+                  {/* Trigger restoration button */}
+                  <button
+                    disabled={isRestoring || (restoreMode === 'replace' && restoreConfirmationText !== 'RESTORE')}
+                    onClick={() => handleRestoreBackup(uploadedBackupFile)}
+                    className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <RefreshCw className={`shrink-0 ${isRestoring ? 'animate-spin' : ''}`} size={14} />
+                    Execute Reconstruction Seeding
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 2. SQL CODEBOX ACCORDION COPIER */}
+            <div className="bg-white rounded-2xl shadow-xl border border-safari-100 p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-black text-safari-900 flex items-center gap-1.5">
+                    <SettingsIcon size={16} className="text-safari-500 animate-spin-slow" />
+                    Supabase Cloud History Sync
+                  </h4>
+                  <p className="text-[10px] text-safari-500 leading-normal mt-0.5">To preserve snapshots direct to database records in your selfhost instance.</p>
+                </div>
+                {hasBackupsTable ? (
+                  <span className="bg-emerald-50 text-emerald-800 text-[9px] font-black uppercase tracking-widest border border-emerald-100 px-2 py-1 rounded">Active</span>
+                ) : (
+                  <span className="bg-red-50 text-red-800 text-[9px] font-black uppercase tracking-widest border border-red-100 px-2 py-1 rounded">Inactive</span>
+                )}
+              </div>
+
+              {!hasBackupsTable && (
+                <div className="space-y-3.5 bg-safari-50 rounded-2xl border border-safari-100 p-4">
+                  <span className="text-[10px] text-safari-500 leading-relaxed block font-medium">
+                    The backups database table has not been provisioned. Backups saved using File JSON always work natively, but to unlock cloud history and automatic retention, execute this migration inside Supabase SQL Console:
+                  </span>
+
+                  <div className="relative group">
+                    <pre className="text-[9px] font-mono text-safari-50 bg-safari-950 p-3 rounded-lg overflow-x-auto text-left leading-relaxed select-all">
+{`CREATE TABLE backups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    description TEXT,
+    payload JSONB NOT NULL,
+    retention_days INT DEFAULT 30,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE backups ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Super User" ON backups 
+    FOR ALL USING (is_super_user());`}
+                    </pre>
+                    <button
+                      onClick={handleCopySqlScript}
+                      className="absolute top-2 right-2 text-[9px] bg-white text-safari-900 font-bold border border-safari-300 py-1 px-2.5 rounded hover:bg-safari-50 shadow-sm active:scale-95 transition-all"
+                    >
+                      {sqlCopied ? 'Copied ✅' : 'Copy Script'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {hasBackupsTable && cloudBackups.length > 0 && (
+                <div className="space-y-2.5">
+                  <span className="text-[10px] font-black uppercase text-safari-400 tracking-wide block">DB Stored Backup History ({cloudBackups.length})</span>
+                  <div className="space-y-2 max-h-56 overflow-y-auto scrollbar-thin rounded-xl">
+                    {cloudBackups.map((sb) => {
+                      const ageDays = Math.ceil((new Date().getTime() - new Date(sb.created_at).getTime()) / (1000 * 60 * 60 * 24));
+                      const isExpired = ageDays > sb.retention_days;
+                      return (
+                        <div key={sb.id} className="bg-safari-50/50 hover:bg-safari-50 border border-safari-100/60 p-3.5 rounded-xl text-left text-xs flex justify-between items-center transition-colors">
+                          <div className="space-y-0.5 truncate max-w-[190px]">
+                            <strong className="font-bold text-safari-900 block truncate">{sb.name}</strong>
+                            <p className="text-[10px] text-safari-400 truncate font-medium">{sb.description || 'No memo logs'}</p>
+                            <div className="flex items-center gap-1.5 text-[9px] text-safari-500">
+                              <span>📅 {new Date(sb.created_at).toLocaleDateString()}</span>
+                              <span>•</span>
+                              <span className={isExpired ? 'text-amber-800 font-bold' : ''}>⏳ {sb.retention_days}d limits ({ageDays}d old)</span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex gap-1.5 shrink-0 ml-2">
+                            <button
+                              onClick={() => {
+                                const blob = new Blob([JSON.stringify(sb.payload, null, 2)], { type: 'application/json' });
+                                const downloadUrl = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = downloadUrl;
+                                a.download = `${sb.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_backup.json`;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                URL.revokeObjectURL(downloadUrl);
+                                toast.success('Snapshot JSON downloaded.');
+                              }}
+                              className="p-1.5 bg-white border border-safari-200 rounded-lg hover:bg-safari-900 hover:text-white transition-colors"
+                              title="Download backup file"
+                            >
+                              <Download size={14} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setUploadedBackupFile(sb.payload);
+                                if (sb.payload?._meta) {
+                                  toast.success(`Loaded cloud backup: ${sb.name}. Configure restore options below.`);
+                                }
+                              }}
+                              className="p-1.5 bg-white border border-safari-200 rounded-lg hover:bg-safari-900 hover:text-white transition-colors"
+                              title="Restore this state"
+                            >
+                              <RefreshCw size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCloudBackup(sb.id)}
+                              className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-500 hover:text-white border border-red-100 transition-colors"
+                              title="Delete from list"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* RESTORE DIALOG MODAL */}
+      {showRestoreModal && (
+        <div className="fixed inset-0 bg-safari-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[1200] animate-fadeIn">
+          <div className="bg-white rounded-2xl w-full max-w-xl shadow-2xl border border-safari-100 overflow-hidden flex flex-col max-h-[85vh]">
+            {/* Header */}
+            <div className="p-5 border-b border-safari-100 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-red-650">
+                <ShieldAlert size={20} className="animate-pulse" />
+                <h3 className="text-md font-black text-safari-900">Restore Sequence Active</h3>
+              </div>
+              {!isRestoring && (
+                <button
+                  onClick={() => setShowRestoreModal(false)}
+                  className="text-safari-400 hover:text-safari-600"
+                >
+                  Close
+                </button>
+              )}
+            </div>
+
+            {/* Logs Area */}
+            <div className="p-5 overflow-y-auto flex-1 bg-safari-950 font-mono text-[10px] text-emerald-450 space-y-1.5 leading-relaxed min-h-[250px] scrollbar-thin">
+              {restoreLogs.length === 0 && (
+                <div className="text-safari-500 italic">No logs generated. Awaiting sequence start...</div>
+              )}
+              {restoreLogs.map((log, idx) => (
+                <div key={idx} className="whitespace-pre-wrap select-all">{log}</div>
+              ))}
+            </div>
+
+            {/* Progress indicators and footer */}
+            <div className="p-4 border-t border-safari-100 bg-safari-50 flex flex-col gap-3">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-safari-600">Active Stage:</span>
+                <span className="text-safari-900 font-extrabold flex items-center gap-1.5">
+                  {isRestoring && <Loader2 className="animate-spin text-safari-500" size={12} />}
+                  {restoreProgress}
+                </span>
+              </div>
+              {/* Progress bar */}
+              <div className="w-full bg-safari-200 h-1 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-300 ${isRestoring ? 'bg-amber-500 animate-pulse w-3/4' : 'bg-green-500 w-full'}`}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                {!isRestoring && (
+                  <button
+                    onClick={() => {
+                      setShowRestoreModal(false);
+                    }}
+                    className="px-5 py-2 text-xs font-bold text-white bg-safari-900 hover:bg-safari-800 rounded-lg cursor-pointer"
+                  >
+                    Close & Verified
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

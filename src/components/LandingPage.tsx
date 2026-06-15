@@ -6,7 +6,7 @@ import {
   Users, ChevronRight, Play, Check, Calculator,
   Heart, User, Briefcase, Star, HelpCircle, 
   Mail, Phone, MapPin, Plus, Minus, Menu, X, Building2,
-  ChevronLeft
+  ChevronLeft, Download
 } from 'lucide-react';
 import { Tooltip } from './ui/Tooltip';
 import { supabase } from '../lib/supabase';
@@ -23,6 +23,8 @@ interface LandingPageProps {
   branding: BrandingConfig;
   masterItineraries?: any[];
   isAuthenticated?: boolean;
+  isAppInstalled?: boolean;
+  onInstallClick?: () => void;
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({ 
@@ -34,7 +36,9 @@ const LandingPage: React.FC<LandingPageProps> = ({
   onViewPartners,
   branding, 
   masterItineraries = [], 
-  isAuthenticated = false 
+  isAuthenticated = false,
+  isAppInstalled = false,
+  onInstallClick
 }) => {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -228,6 +232,16 @@ const LandingPage: React.FC<LandingPageProps> = ({
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
+            {!isAppInstalled && onInstallClick && (
+              <button 
+                onClick={onInstallClick}
+                className="hidden lg:flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-5 py-2.5 rounded-full font-bold text-xs uppercase tracking-widest transition-all shadow-md active:scale-95 whitespace-nowrap"
+                title="Install PWA App"
+              >
+                <Download size={14} className="animate-pulse text-amber-600" />
+                Install App
+              </button>
+            )}
             {/* Start Planning - Sign In/Access button */}
             <button 
               onClick={onAuth}
@@ -277,6 +291,17 @@ const LandingPage: React.FC<LandingPageProps> = ({
               <Calculator size={20} className="text-safari-400" /> Cost Calculator
             </a>
             <div className="pt-6 border-t border-safari-100 flex flex-col gap-4">
+              {!isAppInstalled && onInstallClick && (
+                <button 
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    onInstallClick();
+                  }}
+                  className="w-full py-3.5 bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 rounded-xl font-bold text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                >
+                  <Download size={16} className="animate-pulse text-amber-500" /> Install App PWA
+                </button>
+              )}
               {isAuthenticated && (
                 <button 
                   onClick={() => { 

@@ -248,6 +248,7 @@ const App: React.FC = () => {
   const [isInstallable, setIsInstallable] = useState(false);
   const [isAppInstalled, setIsAppInstalled] = useState(false);
   const [showPwaBanner, setShowPwaBanner] = useState(false);
+  const [showInstallGuide, setShowInstallGuide] = useState(false);
 
   useEffect(() => {
     // Check if app is running as standalone PWA
@@ -765,6 +766,8 @@ const App: React.FC = () => {
           onCalculator={() => navigateToView('calculator')}
           masterItineraries={masterItineraries}
           isAuthenticated={!!user}
+          isAppInstalled={isAppInstalled}
+          onInstallClick={isInstallable ? handleInstallApp : () => setShowInstallGuide(true)}
         />
       );
     }
@@ -847,6 +850,16 @@ const App: React.FC = () => {
                 >
                   Home
                 </button>
+                {!isAppInstalled && (
+                  <button 
+                    onClick={isInstallable ? handleInstallApp : () => setShowInstallGuide(true)}
+                    className="text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors bg-white/10 px-4 py-2 rounded-md border border-white/10 flex items-center gap-1.5"
+                    title="Install SafariPlanner App"
+                  >
+                    <Download size={13} className="animate-pulse" />
+                    Install App
+                  </button>
+                )}
                 <div className="flex items-center gap-2 text-safari-400 text-[10px] font-bold uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
                   <Calculator size={14} /> Agent Tooling
                 </div>
@@ -873,6 +886,21 @@ const App: React.FC = () => {
                 <button onClick={() => { setIsMobileMenuOpen(false); setViewMode('form'); }} className="flex items-center gap-3 text-lg py-2 border-b border-white/5">
                   <Compass size={20} className="text-safari-400" /> Safari Planner
                 </button>
+                {!isAppInstalled && (
+                  <button 
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      if (isInstallable) {
+                        handleInstallApp();
+                      } else {
+                        setShowInstallGuide(true);
+                      }
+                    }} 
+                    className="flex items-center gap-3 text-lg py-2 border-b border-white/5 text-amber-400 bg-white/5 px-2 rounded-lg"
+                  >
+                    <Download size={20} className="text-amber-500 animate-pulse" /> Install PWA App
+                  </button>
+                )}
                 {!user ? (
                   <button 
                     onClick={() => {
@@ -950,9 +978,9 @@ const App: React.FC = () => {
               >
                 Home
               </button>
-              {isInstallable && !isAppInstalled && (
+              {!isAppInstalled && (
                 <button 
-                  onClick={handleInstallApp}
+                  onClick={isInstallable ? handleInstallApp : () => setShowInstallGuide(true)}
                   className="text-sm font-bold text-amber-600 hover:text-amber-705 bg-amber-50 hover:bg-amber-100 px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 border border-amber-250 shadow-sm"
                   title="Install SafariPlanner App"
                 >
@@ -1021,11 +1049,15 @@ const App: React.FC = () => {
                 <button onClick={() => { setIsMobileMenuOpen(false); setViewMode('calculator'); }} className="flex items-center gap-3 py-2 border-b border-safari-50">
                   <Calculator size={20} className="text-safari-400" /> Cost Calculator
                 </button>
-                {isInstallable && !isAppInstalled && (
+                {!isAppInstalled && (
                   <button 
                     onClick={() => {
                       setIsMobileMenuOpen(false);
-                      handleInstallApp();
+                      if (isInstallable) {
+                        handleInstallApp();
+                      } else {
+                        setShowInstallGuide(true);
+                      }
                     }} 
                     className="flex items-center gap-3 py-2 border-b border-safari-50 text-amber-600 bg-amber-50/50 px-3 rounded-xl"
                   >
@@ -1220,6 +1252,109 @@ const App: React.FC = () => {
               <Download size={14} />
               Install Now
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* PWA Install Guide Modal */}
+      {showInstallGuide && (
+        <div className="fixed inset-0 bg-safari-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[1100] animate-fadeIn">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl border border-safari-100 overflow-hidden relative p-6 flex flex-col gap-5">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Compass className="text-safari-600 animate-spin-slow" size={24} />
+                <h3 className="text-lg font-bold text-safari-900">PWA Installation Guide</h3>
+              </div>
+              <button 
+                onClick={() => setShowInstallGuide(false)}
+                className="text-safari-400 hover:text-safari-600 p-1.5 rounded-lg hover:bg-safari-50 transition-colors"
+                aria-label="Close Guide"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex flex-col gap-4 overflow-y-auto max-h-[70vh] pr-1">
+              {/* Iframe detection alert */}
+              {window.self !== window.top ? (
+                <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4 flex flex-col gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
+                    <div>
+                      <strong className="text-sm font-bold block">Preview Pane Limitation Detected</strong>
+                      <span className="text-xs text-amber-700 leading-relaxed block mt-1">
+                        Web browsers block service workers and quick-installation triggers inside cross-origin preview panels (iframes) to prevent clickjacking.
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      window.open(window.location.href, '_blank');
+                    }}
+                    className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1.5"
+                  >
+                    Launch App in New Tab ↗
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-emerald-50 border border-emerald-100 text-emerald-900 rounded-xl p-3 flex items-start gap-2 text-xs">
+                  <Sparkles className="text-emerald-500 shrink-0 mt-0.5 fill-emerald-500 animate-pulse" size={16} />
+                  <span>
+                    You are viewing the app directly! This means SafariPlanner is ready to be installed natively as a standalone app.
+                  </span>
+                </div>
+              )}
+
+              {/* Instructions by OS */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-extrabold text-safari-500 uppercase tracking-widest border-b border-safari-100 pb-1.5">How to install by device:</h4>
+                
+                {/* iOS Safari */}
+                <div className="flex gap-3 items-start text-xs text-safari-700">
+                  <span className="w-5 h-5 rounded-full bg-safari-100 text-safari-700 font-bold flex items-center justify-center shrink-0">1</span>
+                  <div>
+                    <strong className="font-bold text-safari-900 block mb-0.5">iOS Devices (iPhone / iPad)</strong>
+                    <span className="leading-relaxed">
+                      Open in <strong>Safari</strong>, tap the <strong>Share</strong> button <code className="bg-safari-100 px-1 py-0.5 rounded">📥</code> or <code className="bg-safari-100 px-1 py-0.5 rounded text-xs select-all">📤</code> in your toolbar, scroll down, and tap <strong>Add to Home Screen</strong>.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Android Chrome */}
+                <div className="flex gap-3 items-start text-xs text-safari-700">
+                  <span className="w-5 h-5 rounded-full bg-safari-500 text-white font-bold flex items-center justify-center shrink-0">2</span>
+                  <div>
+                    <strong className="font-bold text-safari-900 block mb-0.5">Android (Chrome / Edge)</strong>
+                    <span className="leading-relaxed">
+                      Tap the three-dots menu <code className="bg-safari-100 px-1.5 py-0.5 rounded font-mono">⁝</code> in the top-right and select <strong>Install App</strong> or <strong>Add to Home Screen</strong>.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Desktop */}
+                <div className="flex gap-3 items-start text-xs text-safari-700">
+                  <span className="w-5 h-5 rounded-full bg-safari-900 text-white font-bold flex items-center justify-center shrink-0">3</span>
+                  <div>
+                    <strong className="font-bold text-safari-900 block mb-0.5">Desktop (Chrome / Edge)</strong>
+                    <span className="leading-relaxed">
+                      Tap the <strong>⊕ Install</strong> or monitor icon with an arrow in the right-hand corner of your browser's search/address bar.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer buttons */}
+            <div className="border-t border-safari-100 pt-4 flex justify-end">
+              <button
+                onClick={() => setShowInstallGuide(false)}
+                className="px-5 py-2 text-xs font-bold text-white bg-safari-900 hover:bg-safari-800 rounded-xl shadow-md transition-all active:scale-95"
+              >
+                Got It, Thanks!
+              </button>
+            </div>
           </div>
         </div>
       )}

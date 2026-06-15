@@ -196,6 +196,16 @@ CREATE TABLE IF NOT EXISTS lodge_custom_rates (
     UNIQUE(lodge_id, company_id)
 );
 
+-- Active System Backups Table For Disaster Recovery & Sync
+CREATE TABLE IF NOT EXISTS backups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    description TEXT,
+    payload JSONB NOT NULL,
+    retention_days INTEGER DEFAULT 30,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- Enable Row Level Security
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -209,10 +219,12 @@ ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lodge_custom_rates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE park_fees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE global_activities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE backups ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 
 -- Super User Global Access (ALL)
+CREATE POLICY "Super User Global Access - Backups" ON backups FOR ALL USING (is_super_user());
 CREATE POLICY "Super User Global Access - Companies" ON companies FOR ALL USING (is_super_user());
 CREATE POLICY "Super User Global Access - Profiles" ON profiles FOR ALL USING (is_super_user());
 CREATE POLICY "Super User Global Access - Lodges" ON lodges FOR ALL USING (is_super_user());

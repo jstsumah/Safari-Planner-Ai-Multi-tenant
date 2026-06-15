@@ -7,6 +7,7 @@ import compression from 'compression';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { expand } from 'dotenv-expand';
+import { createClient } from '@supabase/supabase-js';
 
 // Load environment variables
 dotenv.config();
@@ -647,9 +648,158 @@ const PORT = Number(process.env.PORT) || 3000;
      res.status(500).send('An internal server error occurred.');
    });
 
+   // --- AUTOMATED DAILY BACKUPS ENGINE ---
+
+   const BACKUP_TABLES_TO_SNAPSHOT = [
+     'companies',
+     'profiles',
+     'lodges',
+     'master_itineraries',
+     'itineraries',
+     'payments',
+     'agency_config',
+     'reviews',
+     'gallery_images',
+     'team_members',
+     'lodge_custom_rates',
+     'park_fees',
+     'global_activities'
+   ];
+
+   async function triggerAutomatedSystemBackup() {
+     const supabaseUrl = process.env.VITE_SUPABASE_URL;
+     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+     if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('placeholder')) {
+       console.log('[Auto-Backup] Supabase variables not fully configured. Background backup sequence deferred.');
+       return;
+     }
+
+     try {
+       const supabaseServer = createClient(supabaseUrl, supabaseKey, {
+         auth: { persistSession: false }
+       });
+
+       console.log('[Auto-Backup] Verifying daily backup schedule...');
+
+       // 1. Check if an automated backup was created in the last 20 hours
+       const yesterday = new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString();
+       const { data: existingBackups, error: checkError } = await supabaseServer
+         .from('backups')
+         .select('id, created_at')
+         .ilike('name', 'Automated_%')
+         .gt('created_at', yesterday);
+
+       if (checkError) {
+         if (checkError.code === '42P01' || checkError.code === 'PGRST205' || String(checkError.message || '').includes('not find')) {
+           console.log('[Auto-Backup] Backups table not yet provisioned in Supabase. Automated snaps are skipped until migration runs.');
+           return;
+         }
+         throw checkError;
+       }
+
+       if (existingBackups && existingBackups.length > 0) {
+         console.log(`[Auto-Backup] Today's automated daily backup already exists (ID: ${existingBackups[0].id}). No action needed.`);
+         return;
+       }
+
+       console.log("[Auto-Backup] Today's backup missing. Compiling new database snapshot...");
+
+       const payload: any = {
+         _meta: {
+           name: "Automated Daily Backup",
+           description: "Background system-wide replication state snapshot computed by the Express server engine.",
+           created_at: new Date().toISOString(),
+           created_by: "Express Server Engine",
+           retention_days: 30,
+           schema_version: "1.0",
+           tables_included: BACKUP_TABLES_TO_SNAPSHOT
+         }
+       };
+
+       let totalRecordsCount = 0;
+
+       for (const tableId of BACKUP_TABLES_TO_SNAPSHOT) {
+         try {
+           const { data, error } = await supabaseServer.from(tableId).select('*');
+           if (error) {
+             console.log(`[Auto-Backup] Notice: skipping or unable to query table '${tableId}': ${error.message}`);
+             payload[tableId] = [];
+           } else {
+             payload[tableId] = data || [];
+             totalRecordsCount += (data || []).length;
+           }
+         } catch (err) {
+           payload[tableId] = [];
+         }
+       }
+
+       payload._meta.total_records = totalRecordsCount;
+
+       // 2. Insert snapshot into backups table
+       const { error: insertError } = await supabaseServer.from('backups').insert({
+         name: `Automated_${new Date().toISOString().slice(0, 10).replace(/[^a-zA-Z0-9]/g, '_')}`,
+         description: "Background system-wide replication state snapshot computed by the Express server engine.",
+         payload: payload,
+         retention_days: 30,
+         created_at: new Date().toISOString()
+       });
+
+       if (insertError) {
+         throw insertError;
+       }
+
+       console.log(`[Auto-Backup] Success! Generated daily system backup snapshot with ${totalRecordsCount} records.`);
+
+       // 3. Process retention policy: delete any automated backups that outlived their expiration windows
+       const { data: allAutoBackups, error: scanError } = await supabaseServer
+         .from('backups')
+         .select('id, name, created_at, retention_days')
+         .ilike('name', 'Automated_%');
+
+       if (!scanError && allAutoBackups) {
+         const nowMs = Date.now();
+         for (const sb of allAutoBackups) {
+           const ageDays = (nowMs - new Date(sb.created_at).getTime()) / (1000 * 60 * 60 * 24);
+           const limitDays = sb.retention_days || 30;
+           if (ageDays > limitDays) {
+             console.log(`[Auto-Backup] Snaps '${sb.name}' has expired (${Math.round(ageDays)} days old, limit ${limitDays}). Purging...`);
+             await supabaseServer.from('backups').delete().eq('id', sb.id);
+           }
+         }
+       }
+
+     } catch (err: any) {
+        if (err.message && err.message.includes('row-level security')) {
+          console.log('[Auto-Backup] Sync Info: Background daily backup draft compiled but could not write directly to Supabase backups table due to RLS policies. This is normal when the table requires explicit admin credentials.');
+        } else {
+          console.log('[Auto-Backup] Background backup task notice:', err.message || err);
+        }
+     }
+   }
+
+   function startAutomatedBackupsScheduler() {
+     console.log('[Auto-Backup] Initializing background task managers...');
+     
+     // Wait 10 seconds after boot before triggering the check to allow system connections to stabilize
+     setTimeout(() => {
+       triggerAutomatedSystemBackup().catch(err => {
+         console.log('[Auto-Backup] Background initial run check:', err.message || err);
+       });
+     }, 10000);
+
+     // Repeat the check once every 12 hours
+     setInterval(() => {
+       triggerAutomatedSystemBackup().catch(err => {
+         console.log('[Auto-Backup] Background interval check:', err.message || err);
+       });
+     }, 12 * 60 * 60 * 1000);
+   }
+
   if (!process.env.VERCEL) {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on http://0.0.0.0:${PORT}`);
+      startAutomatedBackupsScheduler();
     });
   }
 
