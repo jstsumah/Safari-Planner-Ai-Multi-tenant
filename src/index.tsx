@@ -3,7 +3,10 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider } from './contexts/AuthContext';
+import { inject } from '@vercel/analytics';
 import './index.css';
+
+inject();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
